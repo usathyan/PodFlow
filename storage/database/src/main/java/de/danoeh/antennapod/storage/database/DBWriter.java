@@ -895,10 +895,133 @@ public class DBWriter {
                         SynchronizationQueue.getInstance().enqueueEpisodePlayed(item.getMedia(), true);
                     }
                 }
+
+                // Mark episodes for auto-download when subscribing to a new feed
+                if (!feed.isLocalFeed() && feed.getPreferences() != null) {
+                    FeedPreferences prefs = feed.getPreferences();
+                    boolean shouldAutoDownload = prefs.getAutoDownload() == FeedPreferences.AutoDownloadSetting.ENABLED
+                            || (prefs.getAutoDownload() == FeedPreferences.AutoDownloadSetting.GLOBAL
+                                    && UserPreferences.isEnableAutodownloadGlobal());
+                    if (shouldAutoDownload && feed.getItems() != null && !feed.getItems().isEmpty()) {
+                        Log.d(TAG, "Marking episodes as NEW for auto-download on new subscription");
+
+                        // Determine which episodes to mark based on cache size setting
+                        List<FeedItem> episodesToMark = getEpisodesToMarkForDownload(feed.getItems());
+
+                        for (FeedItem item : episodesToMark) {
+                            // Mark as NEW so auto-download algorithm picks them up
+                            item.setNew();
+                        }
+                        // Persist the NEW state to database
+                        adapter.storeFeedItemlist(feed.getItems());
+                        Log.d(TAG, "Marked " + episodesToMark.size() + " episodes for auto-download");
+                        // Trigger auto-download after marking items
+                        AutoDownloadManager.getInstance().autodownloadUndownloadedItems(context);
+                    }
+                }
             }
             adapter.close();
             EventBus.getDefault().post(new FeedListUpdateEvent(feed));
         });
+    }
+
+    /**
+     * Determines which episodes to mark for download based on the episode cache size setting.
+     * For "Latest" mode, returns all episodes from the most recent publication date.
+     * For numeric limits, returns up to that many episodes (newest first).
+     * For unlimited, returns all episodes.
+     *
+     * @param items List of feed items, assumed to be sorted by date (newest first)
+     * @return List of episodes to mark for auto-download
+     */
+    private static List<FeedItem> getEpisodesToMarkForDownload(List<FeedItem> items) {
+        if (items == null || items.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        int cacheSize = UserPreferences.getEpisodeCacheSize();
+
+        if (cacheSize == UserPreferences.EPISODE_CACHE_SIZE_UNLIMITED) {
+            // Unlimited - return all items
+            return new ArrayList<>(items);
+        } else if (cacheSize == UserPreferences.EPISODE_CACHE_SIZE_LATEST) {
+            // Latest - return all episodes from the most recent publication date
+            return filterLatestDateEpisodes(items);
+        } else {
+            // Numeric limit - return up to cacheSize items
+            int count = Math.min(cacheSize, items.size());
+            return new ArrayList<>(items.subList(0, count));
+        }
+    }
+
+    /**
+     * Filters items to only include episodes from the most recent publication date.
+     * This handles cases where a podcast releases multiple episodes on the same day.
+     *
+     * @param items List of feed items, assumed to be sorted by date (newest first)
+     * @return List of episodes that share the most recent publication date
+     */
+    private static List<FeedItem> filterLatestDateEpisodes(List<FeedItem> items) {
+        if (items.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<FeedItem> latestEpisodes = new ArrayList<>();
+        Date latestDate = null;
+
+        // Log all episodes and their dates for debugging
+        Log.d(TAG, "=== All episodes in feed (" + items.size() + " total) ===");
+        for (int i = 0; i < Math.min(items.size(), 10); i++) {
+            FeedItem item = items.get(i);
+            Date pubDate = item.getPubDate();
+            long dayNum = pubDate != null ? pubDate.getTime() / (24 * 60 * 60 * 1000) : -1;
+            Log.d(TAG, "Episode " + i + ": " + item.getTitle() + " | date=" + pubDate + " | dayNum=" + dayNum);
+        }
+
+        // First pass: find the latest date
+        for (FeedItem item : items) {
+            Date pubDate = item.getPubDate();
+            if (pubDate != null) {
+                if (latestDate == null || pubDate.after(latestDate)) {
+                    latestDate = pubDate;
+                }
+            }
+        }
+
+        if (latestDate == null) {
+            // No items have dates, return empty list
+            return latestEpisodes;
+        }
+
+        long latestDayNum = latestDate.getTime() / (24 * 60 * 60 * 1000);
+        Log.d(TAG, "Latest date found: " + latestDate + " | dayNum=" + latestDayNum);
+
+        // Second pass: collect all episodes from that day
+        for (FeedItem item : items) {
+            Date pubDate = item.getPubDate();
+            if (pubDate != null && isSameDay(pubDate, latestDate)) {
+                latestEpisodes.add(item);
+                Log.d(TAG, "Adding episode from latest date: " + item.getTitle());
+            }
+        }
+
+        Log.d(TAG, "Total episodes from latest date: " + latestEpisodes.size());
+        return latestEpisodes;
+    }
+
+    /**
+     * Checks if two dates fall on the same calendar day in the local timezone.
+     */
+    private static boolean isSameDay(Date date1, Date date2) {
+        if (date1 == null || date2 == null) {
+            return false;
+        }
+        java.util.Calendar cal1 = java.util.Calendar.getInstance();
+        java.util.Calendar cal2 = java.util.Calendar.getInstance();
+        cal1.setTime(date1);
+        cal2.setTime(date2);
+        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
+                && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
     }
 
     /**

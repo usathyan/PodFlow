@@ -7,6 +7,7 @@ import android.os.BatteryManager;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -90,16 +91,28 @@ public class AutomaticDownloadAlgorithm {
                         .makeRoomForEpisodes(context, autoDownloadableEpisodes);
                 boolean cacheIsUnlimited =
                         UserPreferences.getEpisodeCacheSize() == UserPreferences.EPISODE_CACHE_SIZE_UNLIMITED;
+                boolean cacheIsLatest =
+                        UserPreferences.getEpisodeCacheSize() == UserPreferences.EPISODE_CACHE_SIZE_LATEST;
                 int episodeCacheSize = UserPreferences.getEpisodeCacheSize();
 
                 int episodeSpaceLeft;
                 if (cacheIsUnlimited || episodeCacheSize >= downloadedEpisodes + autoDownloadableEpisodes) {
                     episodeSpaceLeft = autoDownloadableEpisodes;
+                } else if (cacheIsLatest) {
+                    // For "Latest" mode, find all episodes from the most recent date
+                    episodeSpaceLeft = autoDownloadableEpisodes; // Will be filtered below
                 } else {
                     episodeSpaceLeft = episodeCacheSize - (downloadedEpisodes - deletedEpisodes);
                 }
 
-                List<FeedItem> itemsToDownload = candidates.subList(0, episodeSpaceLeft);
+                List<FeedItem> itemsToDownload;
+                if (cacheIsLatest && !candidates.isEmpty()) {
+                    // Filter to only include episodes from the latest publication date
+                    itemsToDownload = filterLatestDateEpisodes(candidates);
+                    Log.d(TAG, "Latest mode: filtered to " + itemsToDownload.size() + " episodes from latest date");
+                } else {
+                    itemsToDownload = candidates.subList(0, Math.min(episodeSpaceLeft, candidates.size()));
+                }
                 if (!itemsToDownload.isEmpty()) {
                     Log.d(TAG, "Enqueueing " + itemsToDownload.size() + " items for download");
 
@@ -109,6 +122,56 @@ public class AutomaticDownloadAlgorithm {
                 }
             }
         };
+    }
+
+    /**
+     * Filters candidates to only include episodes from the most recent publication date.
+     * This handles cases where a podcast releases multiple episodes on the same day.
+     *
+     * @param candidates List of candidate episodes, assumed to be sorted by date (newest first)
+     * @return List of episodes that share the most recent publication date
+     */
+    private static List<FeedItem> filterLatestDateEpisodes(List<FeedItem> candidates) {
+        if (candidates.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<FeedItem> latestEpisodes = new ArrayList<>();
+        Date latestDate = null;
+
+        for (FeedItem item : candidates) {
+            Date pubDate = item.getPubDate();
+            if (pubDate == null) {
+                continue;
+            }
+
+            if (latestDate == null) {
+                // First item with a date becomes our reference
+                latestDate = pubDate;
+                latestEpisodes.add(item);
+            } else if (isSameDay(pubDate, latestDate)) {
+                // Same day as latest, include it
+                latestEpisodes.add(item);
+            }
+            // Episodes are sorted newest first, so once we find a different (older) date, we're done
+        }
+
+        return latestEpisodes;
+    }
+
+    /**
+     * Checks if two dates fall on the same calendar day in the local timezone.
+     */
+    private static boolean isSameDay(Date date1, Date date2) {
+        if (date1 == null || date2 == null) {
+            return false;
+        }
+        java.util.Calendar cal1 = java.util.Calendar.getInstance();
+        java.util.Calendar cal2 = java.util.Calendar.getInstance();
+        cal1.setTime(date1);
+        cal2.setTime(date2);
+        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
+                && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
     }
 
     /**
