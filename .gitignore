@@ -43,5 +43,18 @@ proguard
 libs
 *.DS_Store
 gradle.properties
+keystore.properties
 *.keystore
 *.p12
+
+# Python virtual environment (for development scripts)
+.venv/
+__pycache__/
+*.pyc
+
+# Screenshots from testing
+screenshots/
+
+# Android SDK files (when placed in project directory)
+build-tools/
+platforms/

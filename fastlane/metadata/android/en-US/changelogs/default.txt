@@ -1,0 +1,13 @@
+Welcome to PodFlow!
+
+• Beautiful new design with Material You
+• Tiled home screen with podcast artwork
+• Smooth animations throughout
+• Dark mode and AMOLED black themes
+• Variable speed playback
+• Sleep timer with fade-out
+• Queue management with drag & drop
+• Offline downloads
+• Privacy focused - no ads, no tracking
+
+Built on AntennaPod open source (GPL v3)

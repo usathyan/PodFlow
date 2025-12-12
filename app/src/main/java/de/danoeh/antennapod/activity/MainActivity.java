@@ -71,6 +71,7 @@ import de.danoeh.antennapod.ui.screen.drawer.NavDrawerFragment;
 import de.danoeh.antennapod.ui.screen.drawer.NavigationNames;
 import de.danoeh.antennapod.ui.screen.feed.FeedItemlistFragment;
 import de.danoeh.antennapod.ui.screen.home.HomeFragment;
+import de.danoeh.antennapod.ui.screen.home.tiled.TiledHomeFragment;
 import de.danoeh.antennapod.ui.screen.playback.audio.AudioPlayerFragment;
 import de.danoeh.antennapod.ui.screen.preferences.PreferenceActivity;
 import de.danoeh.antennapod.ui.screen.queue.QueueFragment;
@@ -407,7 +408,8 @@ public class MainActivity extends CastEnabledActivity {
         Fragment fragment;
         switch (tag) {
             case HomeFragment.TAG:
-                fragment = new HomeFragment();
+                // Use new Compose-based tiled home screen
+                fragment = TiledHomeFragment.Companion.newInstance();
                 break;
             case QueueFragment.TAG:
                 fragment = new QueueFragment();
@@ -434,8 +436,8 @@ public class MainActivity extends CastEnabledActivity {
                 fragment = new DiscoveryFragment();
                 break;
             default:
-                // default to home screen
-                fragment = new HomeFragment();
+                // default to home screen (new Compose-based tiled view)
+                fragment = TiledHomeFragment.Companion.newInstance();
                 args = null;
                 break;
         }

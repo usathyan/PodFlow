@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- PodFlow Monochrome Icon for themed icons -->
+
+    <!-- Main "P" shape -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M36,28 L36,80
+                         C36,82.2 37.8,84 40,84
+                         L44,84
+                         C46.2,84 48,82.2 48,80
+                         L48,62
+                         L58,62
+                         C70.15,62 80,52.15 80,40
+                         C80,27.85 70.15,18 58,18
+                         L40,18
+                         C37.8,18 36,19.8 36,22
+                         L36,28 Z
+                         M48,30 L58,30
+                         C63.52,30 68,34.48 68,40
+                         C68,45.52 63.52,50 58,50
+                         L48,50
+                         L48,30 Z"/>
+
+    <!-- Middle sound wave arc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="3.5"
+        android:strokeColor="#000000"
+        android:strokeAlpha="0.8"
+        android:strokeLineCap="round"
+        android:pathData="M78,40
+                         A26,26 0 0,0 52,14"/>
+
+    <!-- Outer sound wave arc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="3"
+        android:strokeColor="#000000"
+        android:strokeAlpha="0.6"
+        android:strokeLineCap="round"
+        android:pathData="M86,40
+                         A34,34 0 0,0 52,6"/>
+</vector>

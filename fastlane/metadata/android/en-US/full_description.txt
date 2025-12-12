@@ -1,0 +1,51 @@
+PodFlow is a modern, beautifully designed podcast player that puts your listening experience first. Built with the latest Android technologies for a smooth, responsive experience.
+
+BEAUTIFUL DESIGN
+• Stunning tiled home screen with your podcast artwork
+• Material You dynamic colors that match your wallpaper
+• Smooth animations and intuitive gestures
+• Dark mode and AMOLED black themes
+
+POWERFUL PLAYBACK
+• Variable playback speed (0.5x to 3x)
+• Smart silence trimming to save time
+• Volume boost for quiet podcasts
+• Per-podcast playback settings
+• Sleep timer with gentle fade-out
+• Chapter support with thumbnails
+
+SMART QUEUE MANAGEMENT
+• Drag and drop to reorder episodes
+• Swipe to remove from queue
+• Auto-queue new episodes
+• Smart episode filters
+
+OFFLINE LISTENING
+• Download episodes for offline playback
+• WiFi-only download option
+• Automatic cleanup of played episodes
+• Storage management tools
+
+DISCOVER NEW SHOWS
+• Browse trending podcasts
+• Search by category
+• iTunes and Podcast Index integration
+• OPML import/export
+
+SYNC & BACKUP
+• gpodder.net synchronization
+• Local backup and restore
+• Cross-device sync
+
+PRIVACY FOCUSED
+• No ads, no tracking
+• No account required
+• Your data stays on your device
+• Open source (GPL v3)
+
+OPEN SOURCE
+PodFlow is built on the foundation of AntennaPod, one of the most trusted open-source podcast apps. We're committed to keeping podcasting open and accessible to everyone.
+
+Source code: github.com/AntennaPod/AntennaPod
+
+Download PodFlow today and rediscover the joy of podcasting!
