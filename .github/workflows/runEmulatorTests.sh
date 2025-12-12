@@ -5,7 +5,7 @@ adb logcat -c
 
 runTests() {
     ./gradlew connectedPlayDebugAndroidTest connectedDebugAndroidTest \
-        -Pandroid.testInstrumentationRunnerArguments.notAnnotation=de.test.antennapod.IgnoreOnCi
+        -Pandroid.testInstrumentationRunnerArguments.notAnnotation=de.test.podflow.IgnoreOnCi
 }
 
 # Retry tests to make them less flaky
