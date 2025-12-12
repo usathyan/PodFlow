@@ -1,44 +1,114 @@
-# AntennaPod
+# PodFlow - Modern Podcast Player
 
-[![GitHub check runs](https://img.shields.io/github/check-runs/AntennaPod/AntennaPod/develop)](https://github.com/AntennaPod/AntennaPod/actions/workflows/checks.yml?query=branch%3Adevelop)
-[![License: GPL v3](https://img.shields.io/github/license/AntennaPod/AntennaPod)](https://www.gnu.org/licenses/gpl-3.0)
-[![GitHub Release](https://img.shields.io/github/v/release/AntennaPod/AntennaPod)](https://github.com/AntennaPod/AntennaPod/releases)
-[![https://img.shields.io/github/commits-since/AntennaPod/AntennaPod/latest/develop](https://img.shields.io/github/commits-since/AntennaPod/AntennaPod/latest/develop)](https://github.com/AntennaPod/AntennaPod/commits/develop/)
-[![Translations on Weblate](https://hosted.weblate.org/widget/antennapod/app/svg-badge.svg?native=1)](https://hosted.weblate.org/engage/antennapod/)
-[![Good first issue](https://img.shields.io/github/issues-search?query=repo%3AAntennaPod%2FAntennaPod%20is%3Aopen%20is%3Aissue%20label%3A%22Good%20first%20issue%22&label=Good%20first%20issue&labelColor=grey&color=%235F1984)](https://github.com/AntennaPod/AntennaPod/labels/Good%20first%20issue)
+> Your podcasts, flowing seamlessly
 
-This is the official repository of AntennaPod, the easy-to-use, flexible and open-source podcast manager for Android.
+PodFlow is a modern, beautifully designed podcast player for Android built with Jetpack Compose and Material 3. It's built on the foundation of AntennaPod, one of the most trusted open-source podcast apps.
 
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en_badge_web_generic.png"
-      alt="Get it on Google Play"
-      height="70">](https://play.google.com/store/apps/details?id=de.danoeh.antennapod)
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
-      alt="Get it on F-Droid"
-      height="70">](https://f-droid.org/app/de.danoeh.antennapod)
+## Features
 
-<img src="https://raw.githubusercontent.com/AntennaPod/StoreMetadata/main/listings/en-US/graphics/phone-screenshots/00.png" alt="Screenshot 0" height="200"> <img src="https://raw.githubusercontent.com/AntennaPod/StoreMetadata/main/listings/en-US/graphics/phone-screenshots/01.png" alt="Screenshot 1" height="200"> <img src="https://raw.githubusercontent.com/AntennaPod/StoreMetadata/main/listings/en-US/graphics/phone-screenshots/02.png" alt="Screenshot 2" height="200"> <img src="https://raw.githubusercontent.com/AntennaPod/StoreMetadata/main/listings/en-US/graphics/phone-screenshots/03.png" alt="Screenshot 3" height="200"> <img src="https://raw.githubusercontent.com/AntennaPod/StoreMetadata/main/listings/en-US/graphics/phone-screenshots/04.png" alt="Screenshot 4" height="200"> <img src="https://raw.githubusercontent.com/AntennaPod/StoreMetadata/main/listings/en-US/graphics/phone-screenshots/05.png" alt="Screenshot 5" height="200">
+### Core Features
+- **Beautiful Tiled Home Screen** - Grid view of your subscribed podcasts with instant play
+- **Smart Playback** - Variable speed, silence trimming, volume boost
+- **Discovery** - Find new podcasts with search and category browsing
+- **Offline Listening** - Download episodes for offline playback
+- **Queue Management** - Smart queue with drag-and-drop reordering
 
+### Playback Features
+- Variable playback speed (0.5x - 3x)
+- Silence trimming (Smart Speed)
+- Volume boost/normalization
+- Per-podcast speed settings
+- Sleep timer with fade-out
+- Chapter support
 
-## Feedback
-You can use the [AntennaPod Forum](https://forum.antennapod.org/) for discussions about the app or just podcasting in general.
+### Design
+- Material 3 with Dynamic Color support
+- Light, Dark, and AMOLED themes
+- Beautiful animations and transitions
+- Thumb-friendly navigation
 
-Bug reports and feature requests can be submitted [here](https://github.com/AntennaPod/AntennaPod/issues) (please read the [instructions](https://github.com/AntennaPod/AntennaPod/blob/develop/CONTRIBUTING.md) on how to report a bug and how to submit a feature request first!).
+## Technology Stack
 
-We also hold regular community calls to discuss anything AntennaPod-related. [Come join the next call](https://forum.antennapod.org/t/monthly-community-call/1869)!
+| Component | Technology |
+|-----------|------------|
+| Language | Kotlin 2.0+ |
+| UI Framework | Jetpack Compose |
+| Design System | Material 3 |
+| Architecture | MVVM + Clean Architecture |
+| Async | Kotlin Coroutines + Flow |
+| DI | Hilt (planned) |
+| Database | Room |
+| Networking | Retrofit + OkHttp |
+| Image Loading | Coil |
+| Media | Media3 (ExoPlayer) |
 
-## Help to test AntennaPod
-AntennaPod has many users and we don't want them to run into trouble when we add a new feature. It's important that we have a significant group test our app, so that we know all possible combinations of phones, Android versions and use cases work as expected. Check out our wiki on how to join our [Beta testing program](https://antennapod.org/documentation/general/beta)! If a bug is reported during the beta period, chances are high that it will be fixed before the stable version. If it is reported later, fixing might take another full beta cycle. So definitely let us know if something is not right.
+## Screenshots
+
+[Screenshots to be added]
+
+## Building from Source
+
+### Prerequisites
+- Android Studio Hedgehog or newer
+- JDK 17
+- Android SDK with API 35
+
+### Build Steps
+
+```bash
+# Clone the repository
+git clone https://github.com/usathyan/PodFlow.git
+cd podflow
+
+# Build debug APK
+./gradlew :app:assembleFreeDebug
+
+# Install on connected device
+./gradlew :app:installFreeDebug
+```
+
+## Project Structure
+
+```
+app/src/main/kotlin/de/danoeh/antennapod/
+├── ui/
+│   ├── theme/              # Material 3 theme (Color, Type, Shape, Theme)
+│   └── screen/
+│       ├── home/tiled/     # Tiled home screen
+│       ├── player/         # Now Playing screen
+│       └── discover/       # Discovery/Search screen
+```
 
 ## License
 
-AntennaPod is licensed under the GNU General Public License (GPL-3.0). You can find the license text in the LICENSE file.
+PodFlow is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
-## Translating AntennaPod
+This is a derivative work of [AntennaPod](https://github.com/AntennaPod/AntennaPod), an open-source podcast manager for Android.
 
-If you want to translate AntennaPod into another language, you can visit our [Weblate page](https://hosted.weblate.org/projects/antennapod/).
+### Attribution
 
+```
+PodFlow is built on the foundation of AntennaPod,
+an open-source podcast manager for Android.
+https://github.com/AntennaPod/AntennaPod
 
-## Building AntennaPod
+This app is free software licensed under GPL v3.
+```
 
-You can build AntennaPod just like any other Android project. Refer to the [instructions](https://github.com/AntennaPod/AntennaPod/blob/develop/CONTRIBUTING.md) for more details.
+## Contributing
 
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+
+## Acknowledgments
+
+- [AntennaPod](https://github.com/AntennaPod/AntennaPod) - The foundation this app is built upon
+- [Material Design 3](https://m3.material.io/) - Design system
+- [Jetpack Compose](https://developer.android.com/jetpack/compose) - Modern Android UI toolkit
+
+## Contact
+
+- Issues: [GitHub Issues](https://github.com/usathyan/PodFlow/issues)
+
+---
+
+Made with love for podcast lovers everywhere.

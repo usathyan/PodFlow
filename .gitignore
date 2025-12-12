@@ -58,3 +58,16 @@ screenshots/
 # Android SDK files (when placed in project directory)
 build-tools/
 platforms/
+licenses/
+
+# Local development files
+Makefile
+local.properties
+keystore.properties
+*.keystore
+*.p12
+
+# Temporary files
+.temp/
+.kotlin/
+.claude/
