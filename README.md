@@ -44,7 +44,12 @@ PodFlow is a modern, beautifully designed podcast player for Android built with 
 
 ## Screenshots
 
-[Screenshots to be added]
+<p float="left">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_home.png" width="200" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_queue.png" width="200" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_subscriptions.png" width="200" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_player.png" width="200" />
+</p>
 
 ## Building from Source
 
