@@ -27,6 +27,18 @@ PodFlow is a modern, beautifully designed podcast player for Android built with 
 - Beautiful animations and transitions
 - Thumb-friendly navigation
 
+## What's New in PodFlow
+
+### Enhancements
+- **Auto-download on new subscriptions** - When you subscribe to a new podcast, episodes are automatically downloaded based on your preferences
+- **"Latest" episode limit option** - New download option to keep only the most recent episodes, saving storage space
+- **Default sort for episode lists** - Episodes now sort intelligently by default
+
+### Bug Fixes
+- Fixed auto-download not triggering for newly subscribed podcasts
+- Improved episode list sorting consistency
+- Various UI polish and stability improvements
+
 ## Technology Stack
 
 | Component | Technology |
@@ -45,10 +57,11 @@ PodFlow is a modern, beautifully designed podcast player for Android built with 
 ## Screenshots
 
 <p float="left">
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_home.png" width="200" />
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_queue.png" width="200" />
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_subscriptions.png" width="200" />
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_player.png" width="200" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_home.png" width="180" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_queue.png" width="180" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_subscriptions.png" width="180" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_player.png" width="180" />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05_downloads.png" width="180" />
 </p>
 
 ## Building from Source
