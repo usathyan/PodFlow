@@ -5,57 +5,60 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- PodFlow Icon: A stylized "P" with flowing sound waves -->
-    <!-- Modern, minimal design suggesting podcasts and flow -->
+    <!-- PodFlow Icon: Modern microphone with play symbol -->
+    <!-- Clean, professional podcast app icon -->
 
-    <!-- Main "P" shape with rounded design -->
+    <!-- Main circular microphone head -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M36,28 L36,80
-                         C36,82.2 37.8,84 40,84
-                         L44,84
-                         C46.2,84 48,82.2 48,80
-                         L48,62
-                         L58,62
-                         C70.15,62 80,52.15 80,40
-                         C80,27.85 70.15,18 58,18
-                         L40,18
-                         C37.8,18 36,19.8 36,22
-                         L36,28 Z
-                         M48,30 L58,30
-                         C63.52,30 68,34.48 68,40
-                         C68,45.52 63.52,50 58,50
-                         L48,50
-                         L48,30 Z"/>
+        android:pathData="M54,22
+                         C44.06,22 36,30.06 36,40
+                         L36,52
+                         C36,61.94 44.06,70 54,70
+                         C63.94,70 72,61.94 72,52
+                         L72,40
+                         C72,30.06 63.94,22 54,22
+                         Z"/>
 
-    <!-- Outer sound wave arc -->
+    <!-- Microphone grille lines -->
     <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.6"
-        android:pathData="M72,40
-                         C72,28.95 63.05,20 52,20"
+        android:fillColor="#1E3A5F"
+        android:fillAlpha="0.3"
+        android:pathData="M42,36 L66,36 L66,40 L42,40 Z"/>
+    <path
+        android:fillColor="#1E3A5F"
+        android:fillAlpha="0.3"
+        android:pathData="M42,44 L66,44 L66,48 L42,48 Z"/>
+    <path
+        android:fillColor="#1E3A5F"
+        android:fillAlpha="0.3"
+        android:pathData="M42,52 L66,52 L66,56 L42,56 Z"/>
+
+    <!-- Play triangle inside microphone -->
+    <path
+        android:fillColor="#1E3A5F"
+        android:pathData="M48,34 L48,58 L66,46 Z"/>
+
+    <!-- Microphone stand - curved arc -->
+    <path
+        android:fillColor="#00000000"
         android:strokeWidth="4"
         android:strokeColor="#FFFFFF"
-        android:strokeAlpha="0.6"
-        android:strokeLineCap="round"/>
+        android:strokeLineCap="round"
+        android:pathData="M30,52
+                         C30,65.26 40.74,76 54,76
+                         C67.26,76 78,65.26 78,52"/>
 
-    <!-- Middle sound wave arc -->
+    <!-- Microphone stand - vertical line -->
     <path
         android:fillColor="#00000000"
-        android:strokeWidth="3.5"
+        android:strokeWidth="4"
         android:strokeColor="#FFFFFF"
-        android:strokeAlpha="0.75"
         android:strokeLineCap="round"
-        android:pathData="M78,40
-                         A26,26 0 0,0 52,14"/>
+        android:pathData="M54,76 L54,88"/>
 
-    <!-- Outer sound wave arc -->
+    <!-- Microphone base -->
     <path
-        android:fillColor="#00000000"
-        android:strokeWidth="3"
-        android:strokeColor="#FFFFFF"
-        android:strokeAlpha="0.5"
-        android:strokeLineCap="round"
-        android:pathData="M86,40
-                         A34,34 0 0,0 52,6"/>
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,86 L64,86 L64,90 L44,90 Z"/>
 </vector>

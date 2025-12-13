@@ -89,10 +89,13 @@ public abstract class FeedDatabaseWriter {
 
             // get the most recent date now, before we start changing the list
             FeedItem priorMostRecent = savedFeed.getMostRecentItem();
-            Date priorMostRecentDate = new Date();
+            Date priorMostRecentDate = null;
             if (priorMostRecent != null) {
                 priorMostRecentDate = priorMostRecent.getPubDate();
             }
+            // If no prior items exist (e.g., OPML import), treat all episodes as new
+            // by setting priorMostRecentDate to the earliest possible date
+            final boolean isNewSubscription = (priorMostRecent == null);
 
             // Look for new or updated Items
             for (int idx = 0; idx < newFeed.getItems().size(); idx++) {
@@ -153,7 +156,10 @@ public abstract class FeedDatabaseWriter {
                     }
                     savedFeedDuplicateGuesser.add(item);
 
-                    boolean shouldPerformNewEpisodesAction = item.getPubDate() == null
+                    // For new subscriptions (OPML import, etc.), treat all episodes as new
+                    // For existing feeds, only treat episodes newer than the most recent as new
+                    boolean shouldPerformNewEpisodesAction = isNewSubscription
+                            || item.getPubDate() == null
                             || priorMostRecentDate == null
                             || priorMostRecentDate.before(item.getPubDate())
                             || priorMostRecentDate.equals(item.getPubDate());
