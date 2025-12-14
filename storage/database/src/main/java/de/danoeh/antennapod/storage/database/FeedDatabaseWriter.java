@@ -93,9 +93,10 @@ public abstract class FeedDatabaseWriter {
             if (priorMostRecent != null) {
                 priorMostRecentDate = priorMostRecent.getPubDate();
             }
-            // If no prior items exist (e.g., OPML import), treat all episodes as new
-            // by setting priorMostRecentDate to the earliest possible date
-            final boolean isNewSubscription = (priorMostRecent == null);
+            // Note: isNewSubscription is no longer used to mark all episodes as new.
+            // We now only mark the latest episode(s) even for new subscriptions.
+            // The DBWriter.setFeedState() handles initial subscription marking.
+            final boolean isNewSubscription = false; // Disabled - only latest episodes should be marked
 
             // Look for new or updated Items
             for (int idx = 0; idx < newFeed.getItems().size(); idx++) {
@@ -157,12 +158,13 @@ public abstract class FeedDatabaseWriter {
                     savedFeedDuplicateGuesser.add(item);
 
                     // For new subscriptions (OPML import, etc.), treat all episodes as new
-                    // For existing feeds, only treat episodes newer than the most recent as new
+                    // For existing feeds, treat episodes as new ONLY if they are strictly newer
+                    // than the most recent episode we had before this refresh.
+                    // The auto-download algorithm handles same-day multi-episode drops.
                     boolean shouldPerformNewEpisodesAction = isNewSubscription
                             || item.getPubDate() == null
                             || priorMostRecentDate == null
-                            || priorMostRecentDate.before(item.getPubDate())
-                            || priorMostRecentDate.equals(item.getPubDate());
+                            || priorMostRecentDate.before(item.getPubDate());
                     if (savedFeed.getState() == Feed.STATE_SUBSCRIBED && shouldPerformNewEpisodesAction) {
                         FeedPreferences.NewEpisodesAction action = savedFeed.getPreferences().getNewEpisodesAction();
                         if (action == FeedPreferences.NewEpisodesAction.GLOBAL) {

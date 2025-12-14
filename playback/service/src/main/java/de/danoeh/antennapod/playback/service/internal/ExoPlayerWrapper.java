@@ -1,8 +1,10 @@
 package de.danoeh.antennapod.playback.service.internal;
 
 import android.content.Context;
+import android.media.audiofx.DynamicsProcessing;
 import android.media.audiofx.LoudnessEnhancer;
 import android.net.Uri;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -11,6 +13,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.core.util.Consumer;
+
+import de.danoeh.antennapod.storage.preferences.UserPreferences;
 
 import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
@@ -80,6 +84,9 @@ public class ExoPlayerWrapper {
     private SimpleCache simpleCache;
     @Nullable
     private LoudnessEnhancer loudnessEnhancer = null;
+    @Nullable
+    private DynamicsProcessing dynamicsProcessing = null;
+    private boolean volumeNormalizationEnabled = false;
 
     ExoPlayerWrapper(Context context) {
         this.context = context;
@@ -203,6 +210,18 @@ public class ExoPlayerWrapper {
         if (simpleCache != null) {
             simpleCache.release();
             simpleCache = null;
+        }
+        if (loudnessEnhancer != null) {
+            try {
+                loudnessEnhancer.release();
+            } catch (Exception ignored) { }
+            loudnessEnhancer = null;
+        }
+        if (dynamicsProcessing != null) {
+            try {
+                dynamicsProcessing.release();
+            } catch (Exception ignored) { }
+            dynamicsProcessing = null;
         }
         audioSeekCompleteListener = null;
         audioCompletionListener = null;
@@ -417,5 +436,105 @@ public class ExoPlayerWrapper {
         }
 
         this.loudnessEnhancer = newEnhancer;
+
+        // Initialize volume normalization if enabled
+        initVolumeNormalization(audioStreamId);
+    }
+
+    /**
+     * Initialize DynamicsProcessing for automatic volume normalization.
+     * Uses limiter and compressor to normalize loudness across different podcasts.
+     * Requires Android P (API 28) or higher.
+     */
+    private void initVolumeNormalization(int audioSessionId) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            Log.d(TAG, "Volume normalization requires Android P or higher");
+            return;
+        }
+
+        boolean shouldEnable = UserPreferences.isAutoNormalizeVolume() || UserPreferences.isRadioMode();
+
+        try {
+            // Release old processor if exists
+            if (dynamicsProcessing != null) {
+                dynamicsProcessing.release();
+                dynamicsProcessing = null;
+            }
+
+            if (!shouldEnable) {
+                volumeNormalizationEnabled = false;
+                return;
+            }
+
+            // Create DynamicsProcessing configuration for volume normalization
+            // Using limiter to prevent clipping and compressor for consistent loudness
+            DynamicsProcessing.Config.Builder configBuilder = new DynamicsProcessing.Config.Builder(
+                    DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                    1,      // channel count
+                    true,   // pre-eq enabled
+                    0,      // pre-eq band count
+                    true,   // multi-band compressor enabled
+                    1,      // multi-band compressor band count
+                    true,   // post-eq enabled
+                    0,      // post-eq band count
+                    true    // limiter enabled
+            );
+
+            DynamicsProcessing.Config config = configBuilder.build();
+            dynamicsProcessing = new DynamicsProcessing(0, audioSessionId, config);
+
+            // Configure limiter to prevent clipping and normalize peaks
+            // Limiter settings for consistent output level
+            DynamicsProcessing.Limiter limiter = dynamicsProcessing.getLimiterByChannelIndex(0);
+            limiter.setEnabled(true);
+            limiter.setLinkGroup(0);
+            limiter.setAttackTime(1.0f);      // Fast attack (1ms)
+            limiter.setReleaseTime(100.0f);   // Medium release (100ms)
+            limiter.setRatio(10.0f);          // High ratio for limiting
+            limiter.setThreshold(-1.0f);      // Threshold at -1dB to prevent clipping
+            limiter.setPostGain(0.0f);        // No additional gain
+            dynamicsProcessing.setLimiterByChannelIndex(0, limiter);
+
+            // Configure multi-band compressor for dynamic range compression
+            // This helps normalize loudness differences between podcasts
+            DynamicsProcessing.MbcBand mbcBand = dynamicsProcessing.getMbcBandByChannelIndex(0, 0);
+            mbcBand.setEnabled(true);
+            mbcBand.setAttackTime(10.0f);     // 10ms attack
+            mbcBand.setReleaseTime(100.0f);   // 100ms release
+            mbcBand.setRatio(3.0f);           // 3:1 compression ratio
+            mbcBand.setThreshold(-18.0f);     // Start compressing at -18dB
+            mbcBand.setKneeWidth(6.0f);       // Soft knee for natural sound
+            mbcBand.setPreGain(6.0f);         // Add 6dB makeup gain
+            mbcBand.setPostGain(0.0f);        // No post gain
+            dynamicsProcessing.setMbcBandByChannelIndex(0, 0, mbcBand);
+
+            dynamicsProcessing.setEnabled(true);
+            volumeNormalizationEnabled = true;
+            Log.d(TAG, "Volume normalization enabled with DynamicsProcessing");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize volume normalization: " + e.getMessage());
+            volumeNormalizationEnabled = false;
+            if (dynamicsProcessing != null) {
+                try {
+                    dynamicsProcessing.release();
+                } catch (Exception ignored) { }
+                dynamicsProcessing = null;
+            }
+        }
+    }
+
+    /**
+     * Update volume normalization state based on current preferences.
+     * Call this when Radio Mode or Auto Normalize Volume settings change.
+     */
+    public void updateVolumeNormalization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && exoPlayer != null) {
+            initVolumeNormalization(exoPlayer.getAudioSessionId());
+        }
+    }
+
+    public boolean isVolumeNormalizationEnabled() {
+        return volumeNormalizationEnabled;
     }
 }

@@ -1220,17 +1220,19 @@ public class PlaybackService extends MediaBrowserServiceCompat {
                 DBWriter.markItemPlayed(item, FeedItem.PLAYED, ended || (skipped && almostEnded));
                 // don't know if it actually matters to not autodownload when smart mark as played is triggered
                 DBWriter.removeQueueItem(PlaybackService.this, ended, item);
-                // Delete episode if enabled
+                // Delete episode if enabled (or if Radio Mode is on)
                 FeedPreferences.AutoDeleteAction action =
                         item.getFeed().getPreferences().getCurrentAutoDelete();
                 boolean autoDeleteEnabledGlobally = UserPreferences.isAutoDelete()
                         && (!item.getFeed().isLocalFeed() || UserPreferences.isAutoDeleteLocal());
-                boolean shouldAutoDelete = action == FeedPreferences.AutoDeleteAction.ALWAYS
+                boolean radioModeEnabled = UserPreferences.isRadioMode();
+                boolean shouldAutoDelete = radioModeEnabled
+                        || action == FeedPreferences.AutoDeleteAction.ALWAYS
                         || (action == FeedPreferences.AutoDeleteAction.GLOBAL && autoDeleteEnabledGlobally);
                 if (shouldAutoDelete && (!item.isTagged(FeedItem.TAG_FAVORITE)
                         || !UserPreferences.shouldFavoriteKeepEpisode())) {
                     DBWriter.deleteFeedMediaOfItem(PlaybackService.this, media);
-                    Log.d(TAG, "Episode Deleted");
+                    Log.d(TAG, "Episode Deleted" + (radioModeEnabled ? " (Radio Mode)" : ""));
                 }
                 notifyChildrenChanged(getString(R.string.queue_label));
             }

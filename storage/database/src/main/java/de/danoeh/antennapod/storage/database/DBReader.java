@@ -285,6 +285,110 @@ public final class DBReader {
         }
     }
 
+    /**
+     * Gets the count of NEW episodes, but only counting the latest episode per podcast.
+     * This respects the "latest only" download philosophy where we only want to show
+     * one new episode per podcast in the inbox.
+     *
+     * @return Count of new episodes (latest per podcast only)
+     */
+    public static int getLatestNewEpisodeCount() {
+        List<FeedItem> latestNewEpisodes = getLatestNewEpisodes();
+        return latestNewEpisodes.size();
+    }
+
+    /**
+     * Gets NEW episodes filtered to only include the latest episode per podcast.
+     * If a podcast has multiple new episodes, only the most recent one is returned.
+     *
+     * @return List of the latest new episode from each podcast
+     */
+    public static List<FeedItem> getLatestNewEpisodes() {
+        List<FeedItem> allNewEpisodes = getEpisodes(0, Integer.MAX_VALUE,
+                new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
+
+        // Group by feed and keep only the latest per feed
+        Map<Long, FeedItem> latestPerFeed = new HashMap<>();
+        for (FeedItem item : allNewEpisodes) {
+            long feedId = item.getFeedId();
+            if (!latestPerFeed.containsKey(feedId)) {
+                // First (and latest due to sort order) episode for this feed
+                latestPerFeed.put(feedId, item);
+            } else {
+                // Check if this episode is from the same day as the latest
+                // If so, include it too (handles same-day multi-episode drops)
+                FeedItem existing = latestPerFeed.get(feedId);
+                if (existing.getPubDate() != null && item.getPubDate() != null
+                        && isSameDay(existing.getPubDate(), item.getPubDate())) {
+                    // Same day - we need to track multiple, but for count we just need 1
+                    // For the list version, we'll handle this differently
+                }
+            }
+        }
+
+        return new ArrayList<>(latestPerFeed.values());
+    }
+
+    /**
+     * Gets NEW episodes filtered to only include episodes from the latest date per podcast.
+     * If a podcast has multiple new episodes from the same day, all are returned.
+     *
+     * @param offset Offset for pagination
+     * @param limit Maximum number of episodes to return
+     * @param sortOrder Sort order for results
+     * @return List of new episodes (latest date per podcast)
+     */
+    public static List<FeedItem> getLatestNewEpisodesWithSameDay(int offset, int limit, SortOrder sortOrder) {
+        List<FeedItem> allNewEpisodes = getEpisodes(0, Integer.MAX_VALUE,
+                new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
+
+        // Group by feed and find latest date per feed
+        Map<Long, java.util.Date> latestDatePerFeed = new HashMap<>();
+        for (FeedItem item : allNewEpisodes) {
+            long feedId = item.getFeedId();
+            java.util.Date pubDate = item.getPubDate();
+            if (pubDate != null) {
+                if (!latestDatePerFeed.containsKey(feedId) || pubDate.after(latestDatePerFeed.get(feedId))) {
+                    latestDatePerFeed.put(feedId, pubDate);
+                }
+            }
+        }
+
+        // Filter to only include episodes from the latest date per feed
+        List<FeedItem> result = new ArrayList<>();
+        for (FeedItem item : allNewEpisodes) {
+            long feedId = item.getFeedId();
+            java.util.Date latestDate = latestDatePerFeed.get(feedId);
+            if (latestDate != null && item.getPubDate() != null
+                    && isSameDay(item.getPubDate(), latestDate)) {
+                result.add(item);
+            } else if (latestDate == null && item.getPubDate() == null) {
+                // No dates - include the first one per feed
+                if (!latestDatePerFeed.containsKey(feedId)) {
+                    result.add(item);
+                    latestDatePerFeed.put(feedId, null);
+                }
+            }
+        }
+
+        // Apply pagination
+        int start = Math.min(offset, result.size());
+        int end = Math.min(offset + limit, result.size());
+        return result.subList(start, end);
+    }
+
+    private static boolean isSameDay(java.util.Date date1, java.util.Date date2) {
+        if (date1 == null || date2 == null) {
+            return false;
+        }
+        java.util.Calendar cal1 = java.util.Calendar.getInstance();
+        java.util.Calendar cal2 = java.util.Calendar.getInstance();
+        cal1.setTime(date1);
+        cal2.setTime(date2);
+        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
+                && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
+    }
+
     public static int getFeedEpisodeCount(long feedId, FeedItemFilter filter) {
         PodDBAdapter adapter = PodDBAdapter.getInstance();
         adapter.open();
@@ -756,7 +860,7 @@ public final class DBReader {
 
         Collections.sort(feeds, comparator);
         final int queueSize = adapter.getQueueSize();
-        final int numNewItems = getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.NEW));
+        final int numNewItems = getLatestNewEpisodeCount();
         final int numDownloadedItems = getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.DOWNLOADED));
 
         NavDrawerData.TagItem untaggedTag = new NavDrawerData.TagItem(FeedPreferences.TAG_UNTAGGED);

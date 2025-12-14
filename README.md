@@ -2,42 +2,50 @@
 
 > Your podcasts, flowing seamlessly
 
-PodFlow is a modern, beautifully designed podcast player for Android built with Jetpack Compose and Material 3. It's built on the foundation of AntennaPod, one of the most trusted open-source podcast apps.
+PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) redesigned for a **radio-like listening experience**. Instead of managing individual episodes, PodFlow focuses on automatic playback with minimal interaction - just pick a podcast and listen.
 
-## Features
+---
 
-### Core Features
-- **Beautiful Tiled Home Screen** - Grid view of your subscribed podcasts with instant play
-- **Smart Playback** - Variable speed, silence trimming, volume boost
-- **Discovery** - Find new podcasts with search and category browsing
-- **Offline Listening** - Download episodes for offline playback
-- **Queue Management** - Smart queue with drag-and-drop reordering
+## How PodFlow Differs from AntennaPod
 
-### Playback Features
-- Variable playback speed (0.5x - 3x)
+| Feature | AntennaPod | PodFlow |
+|---------|------------|---------|
+| **Home Screen** | Episode-centric feed | Tiled podcast grid with one-tap play |
+| **Auto-Download** | Downloads all new episodes | Downloads only the latest episode per podcast |
+| **Radio Mode** | Not available | Auto-deletes played episodes, auto-advances to next |
+| **Volume Normalization** | Manual boost only | Real-time audio normalization across podcasts |
+| **Episode Management** | Manual queue management | Automatic - episodes disappear after playing |
+| **Philosophy** | Full podcast management | Hands-off radio experience |
+
+### Key PodFlow Features
+
+- **Radio Mode** - Enable from home screen menu. Episodes auto-delete after playback and volume is normalized across all podcasts for seamless listening.
+- **Smart Latest-Only Downloads** - Only downloads the most recent episode from each podcast. If a podcast drops multiple episodes on the same day, all are downloaded.
+- **Tiled Home Screen** - Visual grid of your podcasts. Tap to play instantly. Configurable 2/3/Auto columns with list view option.
+- **Real-Time Volume Normalization** - Uses Android's DynamicsProcessing API to compress and limit audio, ensuring consistent volume across different podcasts.
+- **Smart Inbox** - Shows only the latest new episode per podcast, not all accumulated episodes.
+
+### App Navigation
+
+| Screen | What it shows |
+|--------|---------------|
+| **Home** | Grid of podcast tiles with play buttons. Tap to play the latest downloaded episode. |
+| **Queue** | Episodes queued for sequential playback. Drag to reorder. |
+| **Inbox** | New episodes (one per podcast). Swipe to dismiss or add to queue. |
+| **Downloads** | All downloaded episodes for offline listening. |
+
+### Inherited from AntennaPod
+
+PodFlow inherits all the great features from AntennaPod:
+- Variable playback speed (0.5x - 3x) with per-podcast settings
 - Silence trimming (Smart Speed)
-- Volume boost/normalization
-- Per-podcast speed settings
-- Sleep timer with fade-out
-- Chapter support
+- Sleep timer with shake-to-reset and fade-out
+- Chapter support and transcript viewing
+- OPML import/export
+- Streaming and offline playback
+- Chromecast support
 
-### Design
-- Material 3 with Dynamic Color support
-- Light, Dark, and AMOLED themes
-- Beautiful animations and transitions
-- Thumb-friendly navigation
-
-## What's New in PodFlow
-
-### Enhancements
-- **Auto-download on new subscriptions** - When you subscribe to a new podcast, episodes are automatically downloaded based on your preferences
-- **"Latest" episode limit option** - New download option to keep only the most recent episodes, saving storage space
-- **Default sort for episode lists** - Episodes now sort intelligently by default
-
-### Bug Fixes
-- Fixed auto-download not triggering for newly subscribed podcasts
-- Improved episode list sorting consistency
-- Various UI polish and stability improvements
+---
 
 ## Technology Stack
 

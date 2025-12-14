@@ -926,32 +926,21 @@ public class DBWriter {
     }
 
     /**
-     * Determines which episodes to mark for download based on the episode cache size setting.
-     * For "Latest" mode, returns all episodes from the most recent publication date.
-     * For numeric limits, returns up to that many episodes (newest first).
-     * For unlimited, returns all episodes.
+     * Determines which episodes to mark for download.
+     * ALWAYS returns only episodes from the most recent publication date.
+     * This ensures only the latest episode(s) are auto-downloaded, regardless of cache size.
+     * If multiple episodes are released on the same day, all of them are included.
      *
      * @param items List of feed items, assumed to be sorted by date (newest first)
-     * @return List of episodes to mark for auto-download
+     * @return List of episodes to mark for auto-download (only latest date)
      */
     private static List<FeedItem> getEpisodesToMarkForDownload(List<FeedItem> items) {
         if (items == null || items.isEmpty()) {
             return new ArrayList<>();
         }
 
-        int cacheSize = UserPreferences.getEpisodeCacheSize();
-
-        if (cacheSize == UserPreferences.EPISODE_CACHE_SIZE_UNLIMITED) {
-            // Unlimited - return all items
-            return new ArrayList<>(items);
-        } else if (cacheSize == UserPreferences.EPISODE_CACHE_SIZE_LATEST) {
-            // Latest - return all episodes from the most recent publication date
-            return filterLatestDateEpisodes(items);
-        } else {
-            // Numeric limit - return up to cacheSize items
-            int count = Math.min(cacheSize, items.size());
-            return new ArrayList<>(items.subList(0, count));
-        }
+        // ALWAYS return only the latest episode(s) - never mark old episodes for download
+        return filterLatestDateEpisodes(items);
     }
 
     /**

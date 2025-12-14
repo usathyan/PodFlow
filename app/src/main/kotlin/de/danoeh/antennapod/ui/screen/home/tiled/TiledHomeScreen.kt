@@ -10,27 +10,41 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.outlined.Podcasts
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +56,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import de.danoeh.antennapod.storage.preferences.UserPreferences
 import de.danoeh.antennapod.ui.theme.PodcastTileShape
 
 /**
@@ -75,6 +92,12 @@ fun TiledHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
+    // Layout preferences state
+    var gridColumns by remember { mutableStateOf(UserPreferences.getHomeGridColumns()) }
+    var viewMode by remember { mutableStateOf(UserPreferences.getHomeViewMode()) }
+    var showMenu by remember { mutableStateOf(false) }
+    var radioMode by remember { mutableStateOf(UserPreferences.isRadioMode()) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -90,12 +113,126 @@ fun TiledHomeScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 actions = {
+                    // View mode toggle button
+                    IconButton(
+                        onClick = {
+                            viewMode = if (viewMode == UserPreferences.HomeViewMode.GRID) {
+                                UserPreferences.HomeViewMode.LIST
+                            } else {
+                                UserPreferences.HomeViewMode.GRID
+                            }
+                            UserPreferences.setHomeViewMode(viewMode)
+                        }
+                    ) {
+                        Icon(
+                            if (viewMode == UserPreferences.HomeViewMode.GRID) Icons.Default.ViewList else Icons.Default.GridView,
+                            contentDescription = if (viewMode == UserPreferences.HomeViewMode.GRID) "Switch to List" else "Switch to Grid",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     IconButton(onClick = { viewModel.loadPodcasts() }) {
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Refresh",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+
+                    // Settings menu
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            Text(
+                                "Grid Columns",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("2 Columns") },
+                                onClick = {
+                                    gridColumns = UserPreferences.HomeGridColumns.TWO
+                                    UserPreferences.setHomeGridColumns(gridColumns)
+                                    showMenu = false
+                                },
+                                leadingIcon = {
+                                    if (gridColumns == UserPreferences.HomeGridColumns.TWO) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("3 Columns") },
+                                onClick = {
+                                    gridColumns = UserPreferences.HomeGridColumns.THREE
+                                    UserPreferences.setHomeGridColumns(gridColumns)
+                                    showMenu = false
+                                },
+                                leadingIcon = {
+                                    if (gridColumns == UserPreferences.HomeGridColumns.THREE) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("Auto (Adaptive)") },
+                                onClick = {
+                                    gridColumns = UserPreferences.HomeGridColumns.AUTO
+                                    UserPreferences.setHomeGridColumns(gridColumns)
+                                    showMenu = false
+                                },
+                                leadingIcon = {
+                                    if (gridColumns == UserPreferences.HomeGridColumns.AUTO) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                            Text(
+                                "Radio Mode",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text("Radio Mode")
+                                        Text(
+                                            "Auto-delete after play, normalize volume",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    radioMode = !radioMode
+                                    UserPreferences.setRadioMode(radioMode)
+                                },
+                                leadingIcon = {
+                                    if (radioMode) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -132,20 +269,38 @@ fun TiledHomeScreen(
                     }
                 }
                 is TiledHomeUiState.Success -> {
-                    PodcastGrid(
-                        podcasts = state.podcasts,
-                        onPlayClick = { podcast ->
-                            val started = viewModel.playLatestEpisode(context, podcast)
-                            if (!started) {
-                                Toast.makeText(
-                                    context,
-                                    "No downloaded episodes available",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        },
-                        onPodcastClick = onPodcastClick
-                    )
+                    if (viewMode == UserPreferences.HomeViewMode.LIST) {
+                        PodcastList(
+                            podcasts = state.podcasts,
+                            onPlayClick = { podcast ->
+                                val started = viewModel.playLatestEpisode(context, podcast)
+                                if (!started) {
+                                    Toast.makeText(
+                                        context,
+                                        "No downloaded episodes available",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            },
+                            onPodcastClick = onPodcastClick
+                        )
+                    } else {
+                        PodcastGrid(
+                            podcasts = state.podcasts,
+                            gridColumns = gridColumns,
+                            onPlayClick = { podcast ->
+                                val started = viewModel.playLatestEpisode(context, podcast)
+                                if (!started) {
+                                    Toast.makeText(
+                                        context,
+                                        "No downloaded episodes available",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            },
+                            onPodcastClick = onPodcastClick
+                        )
+                    }
                 }
             }
         }
@@ -155,11 +310,18 @@ fun TiledHomeScreen(
 @Composable
 private fun PodcastGrid(
     podcasts: List<PodcastTileData>,
+    gridColumns: UserPreferences.HomeGridColumns = UserPreferences.HomeGridColumns.AUTO,
     onPlayClick: (PodcastTileData) -> Unit,
     onPodcastClick: (PodcastTileData) -> Unit
 ) {
+    val columns = when (gridColumns) {
+        UserPreferences.HomeGridColumns.TWO -> GridCells.Fixed(2)
+        UserPreferences.HomeGridColumns.THREE -> GridCells.Fixed(3)
+        UserPreferences.HomeGridColumns.AUTO -> GridCells.Adaptive(minSize = 150.dp)
+    }
+
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 150.dp),
+        columns = columns,
         contentPadding = PaddingValues(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -170,6 +332,121 @@ private fun PodcastGrid(
                 onPlayClick = { onPlayClick(podcast) },
                 onClick = { onPodcastClick(podcast) }
             )
+        }
+    }
+}
+
+@Composable
+private fun PodcastList(
+    podcasts: List<PodcastTileData>,
+    onPlayClick: (PodcastTileData) -> Unit,
+    onPodcastClick: (PodcastTileData) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(podcasts, key = { it.feed.id }) { podcast ->
+            PodcastListItem(
+                podcast = podcast,
+                onPlayClick = { onPlayClick(podcast) },
+                onClick = { onPodcastClick(podcast) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun PodcastListItem(
+    podcast: PodcastTileData,
+    onPlayClick: () -> Unit,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.98f else 1f,
+        label = "list_item_scale"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Podcast cover image
+            Card(
+                modifier = Modifier.size(64.dp),
+                shape = RoundedCornerShape(8.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(podcast.feed.imageUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = podcast.feed.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Title and episode count
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = podcast.feed.title ?: "Unknown",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (podcast.downloadedEpisodeCount > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${podcast.downloadedEpisodeCount} downloaded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Play button
+            Surface(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .clickable { onPlayClick() },
+                color = MaterialTheme.colorScheme.primary,
+                shape = CircleShape
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Play latest episode",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
         }
     }
 }

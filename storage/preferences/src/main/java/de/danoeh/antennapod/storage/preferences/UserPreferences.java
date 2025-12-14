@@ -63,6 +63,15 @@ public abstract class UserPreferences {
     public static final String PREF_BACK_OPENS_DRAWER = "prefBackButtonOpensDrawer";
     public static final String PREF_BOTTOM_NAVIGATION = "prefBottomNavigation";
 
+    // Home Screen Grid Settings
+    public static final String PREF_HOME_GRID_COLUMNS = "prefHomeGridColumns";
+    public static final String PREF_HOME_VIEW_MODE = "prefHomeViewMode";
+    public static final String PREF_QUEUE_DOWNLOADED_ONLY = "prefQueueDownloadedOnly";
+
+    // Radio Mode Settings
+    public static final String PREF_RADIO_MODE = "prefRadioMode";
+    public static final String PREF_AUTO_NORMALIZE_VOLUME = "prefAutoNormalizeVolume";
+
     public static final String PREF_GLOBAL_DEFAULT_SORTED_ORDER = "prefGlobalDefaultSortedOrder";
     public static final String PREF_QUEUE_KEEP_SORTED = "prefQueueKeepSorted";
     public static final String PREF_QUEUE_KEEP_SORTED_ORDER = "prefQueueKeepSortedOrder";
@@ -157,6 +166,28 @@ public abstract class UserPreferences {
 
     public enum ThemePreference {
         LIGHT, DARK, BLACK, SYSTEM
+    }
+
+    public enum HomeGridColumns {
+        TWO(2), THREE(3), AUTO(0);
+
+        public final int value;
+        HomeGridColumns(int value) {
+            this.value = value;
+        }
+
+        public static HomeGridColumns fromValue(int value) {
+            for (HomeGridColumns columns : values()) {
+                if (columns.value == value) {
+                    return columns;
+                }
+            }
+            return AUTO;
+        }
+    }
+
+    public enum HomeViewMode {
+        GRID, LIST
     }
 
     public static void setTheme(ThemePreference theme) {
@@ -889,5 +920,62 @@ public abstract class UserPreferences {
 
     public static void setPrefFilterAllEpisodes(String filter) {
         prefs.edit().putString(PREF_FILTER_ALL_EPISODES, filter).apply();
+    }
+
+    // Home Screen Grid Preferences
+
+    public static HomeGridColumns getHomeGridColumns() {
+        int value = prefs.getInt(PREF_HOME_GRID_COLUMNS, HomeGridColumns.AUTO.value);
+        return HomeGridColumns.fromValue(value);
+    }
+
+    public static void setHomeGridColumns(HomeGridColumns columns) {
+        prefs.edit().putInt(PREF_HOME_GRID_COLUMNS, columns.value).apply();
+    }
+
+    public static HomeViewMode getHomeViewMode() {
+        String value = prefs.getString(PREF_HOME_VIEW_MODE, HomeViewMode.GRID.name());
+        try {
+            return HomeViewMode.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            return HomeViewMode.GRID;
+        }
+    }
+
+    public static void setHomeViewMode(HomeViewMode mode) {
+        prefs.edit().putString(PREF_HOME_VIEW_MODE, mode.name()).apply();
+    }
+
+    public static boolean isQueueDownloadedOnly() {
+        return prefs.getBoolean(PREF_QUEUE_DOWNLOADED_ONLY, false);
+    }
+
+    public static void setQueueDownloadedOnly(boolean downloadedOnly) {
+        prefs.edit().putBoolean(PREF_QUEUE_DOWNLOADED_ONLY, downloadedOnly).apply();
+    }
+
+    // Radio Mode Preferences
+
+    /**
+     * Radio Mode: Enables seamless listening experience with auto-delete after playback,
+     * auto-advance to next episode, and automatic volume normalization.
+     */
+    public static boolean isRadioMode() {
+        return prefs.getBoolean(PREF_RADIO_MODE, false);
+    }
+
+    public static void setRadioMode(boolean enabled) {
+        prefs.edit().putBoolean(PREF_RADIO_MODE, enabled).apply();
+    }
+
+    /**
+     * Auto normalize volume to provide consistent loudness across different podcasts.
+     */
+    public static boolean isAutoNormalizeVolume() {
+        return prefs.getBoolean(PREF_AUTO_NORMALIZE_VOLUME, false);
+    }
+
+    public static void setAutoNormalizeVolume(boolean enabled) {
+        prefs.edit().putBoolean(PREF_AUTO_NORMALIZE_VOLUME, enabled).apply();
     }
 }
