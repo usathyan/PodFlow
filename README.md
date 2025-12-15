@@ -65,6 +65,211 @@ PodFlow inherits all the great features from AntennaPod:
 
 ---
 
+## Complete Changelog from AntennaPod
+
+This section documents all modifications made to the AntennaPod codebase to create PodFlow.
+
+### Core Features Added
+
+#### 1. **Radio Mode** (`772aad2bd`, `2f7efcab6`, `88fb8b93e`, `79f567a9d`, `68dafad7d`)
+- **New playback mode** that auto-advances to the next podcast when an episode finishes
+- **Auto-deletion**: Episodes are automatically deleted after playback (smart deletion - only when next episode arrives)
+- **Volume normalization**: Real-time audio processing using Android's `LoudnessEnhancer` and `DynamicsProcessing` APIs
+- **Audio crossfade/blend**: Configurable fade times (0s, 30s, 1m, 5m, 10m) for smooth transitions between podcasts
+- **Skip behavior**: Skip button marks episode as listened and advances to next podcast (no deletion)
+- **Enabled by default**: Radio Mode is the default experience for new installs
+
+**Files Modified:**
+- `playback/service/src/main/java/de/danoeh/antennapod/playback/service/PlaybackService.java`
+  - Added Radio Mode playback logic at lines 1105-1298
+  - Implemented `getNextInQueue()` override for Radio Mode
+  - Added blend/crossfade support on episode completion
+  - Volume normalization integration
+- `playback/service/src/main/java/de/danoeh/antennapod/playback/service/internal/ExoPlayerWrapper.java`
+  - Integrated `LoudnessEnhancer` and `DynamicsProcessing` for volume normalization
+  - Auto-enables when Radio Mode is active
+- `storage/database/src/main/java/de/danoeh/antennapod/storage/database/DBReader.java`
+  - Added `getNextForRadioMode()` method (lines 499-522)
+  - Added `getNextSameDayEpisode()` helper (lines 528-557)
+  - Added `getNextPodcastEpisode()` helper (lines 564-602)
+- `storage/preferences/src/main/java/de/danoeh/antennapod/storage/preferences/UserPreferences.java`
+  - Added Radio Mode preference flags (lines 71-74)
+  - Added blend time preference management (lines 975-985)
+  - Added volume normalization preferences (lines 958-997)
+
+#### 2. **Tiled Home Screen** (`77104c903`, `280874a38`)
+- **Jetpack Compose UI**: Modern, grid-based podcast view
+- **One-tap play**: Each podcast tile has a play button to instantly start the latest episode
+- **Configurable layout**: 2/3/Auto columns, list/grid view toggle
+- **Date sorting**: Podcasts sorted by latest episode date (newest first)
+- **Download badges**: Visual indicators showing downloaded episode count
+- **Set as default home page**: Replaces traditional episode-centric feed
+
+**Files Created:**
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeScreen.kt` (808 lines)
+  - Jetpack Compose UI implementation
+  - Grid/List view rendering
+  - Play button tap handling
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeViewModel.kt` (100 lines)
+  - ViewModel for managing podcast list state
+  - Sorting by latest episode date
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeFragment.kt` (45 lines)
+  - Fragment wrapper for Compose UI
+- `app/src/test/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeViewModelTest.kt` (134 lines)
+  - Unit tests for ViewModel
+
+**Files Modified:**
+- `app/src/main/java/de/danoeh/antennapod/activity/MainActivity.java`
+  - Changed default home fragment to `TiledHomeFragment` (line 410-412)
+  - Added navigation support for tiled home
+
+#### 3. **Smart Latest-Only Downloads** (`772aad2bd`, `1fce9c9bf`)
+- **One episode per podcast**: Auto-download only downloads the latest unplayed episode
+- **Same-day multi-episode support**: If podcast publishes multiple episodes on same day, all are downloaded
+- **HTTP 416 handling**: Properly handles already-downloaded files without re-downloading
+- **Auto-download on subscription**: New subscriptions automatically download latest episode
+
+**Files Modified:**
+- `net/download/service/src/main/java/de/danoeh/antennapod/net/download/service/episode/autodownload/AutomaticDownloadAlgorithm.java`
+  - Modified logic to download only latest episode per podcast (85+ line changes)
+  - Added same-day multi-episode detection
+- `net/download/service/src/main/java/de/danoeh/antennapod/net/download/service/feed/remote/HttpDownloader.java`
+  - Added HTTP 416 (Range Not Satisfiable) handling for resume support
+
+#### 4. **Smart Inbox** (`772aad2bd`)
+- **Accurate episode count**: Shows total NEW episodes across all podcasts (not just podcast count)
+- **Swipe actions**: Swipe to mark as listened and auto-advance to next
+
+**Files Modified:**
+- `app/src/main/java/de/danoeh/antennapod/ui/screen/home/sections/InboxSection.java`
+  - Fixed inbox count calculation to show episode count
+- `app/src/main/java/de/danoeh/antennapod/ui/screen/InboxFragment.java`
+  - Updated swipe behavior for Radio Mode
+
+### Bug Fixes
+
+#### Radio Mode Crash Fixes
+- **Lambda variable scope fix** (`68dafad7d`): Fixed `ClassCastException` where `nextItem` variable wasn't final in lambda expressions
+- **Audio threading crash fix** (`79f567a9d`): Fixed thread safety issues in blend transitions
+- **Blend time preference fix** (pending): Fixed `ClassCastException` when reading blend time preference (String vs Integer type mismatch)
+
+#### Other Fixes
+- **OPML import auto-download** (`1fce9c9bf`): Fixed auto-download triggering on OPML import
+- **HTTP 416 handling** (`1fce9c9bf`): Fixed download resume for already-downloaded files
+
+### UI/UX Changes
+
+#### Branding
+- **Rebranded from AntennaPod to PodFlow** (`111bf068b`, `def690fe1`)
+- **New app icon** (`1fce9c9bf`)
+- **Updated screenshots** (`def690fe1`, `a7208f5fa`, `3c935d6f5`)
+- **Material 3 theme**: Custom color scheme and typography
+
+**Files Created:**
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/theme/Color.kt`
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/theme/Type.kt`
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/theme/Shape.kt`
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/theme/Theme.kt`
+
+#### Settings UI
+- Added Radio Mode settings category in Playback preferences
+- Added blend/crossfade time picker
+- Added volume normalization toggle
+
+**Files Modified:**
+- `ui/preferences/src/main/res/xml/preferences_playback.xml`
+  - Added Radio Mode preference switches
+  - Added blend time list preference
+
+### Configuration Changes
+
+#### Default Settings (for Fresh Installs)
+- Radio Mode: **ON** (was OFF)
+- Audio crossfade: **30 seconds** (was 0/disabled)
+- Volume normalization: **ON** (was OFF)
+- Auto-download: **ON** (unchanged)
+
+#### Build Configuration
+- Package name: `app.podflow.player` (was `de.danoeh.antennapod`)
+- App name: PodFlow (was AntennaPod)
+- Updated icons and branding assets
+
+**Files Modified:**
+- `app/build.gradle`: Updated applicationId
+- `build.gradle`: Updated dependencies
+- `common.gradle`: Build configuration tweaks
+
+### Documentation
+
+#### New Documentation
+- `docs/plans/2025-12-11-podflow-production-app-design.md`: Overall app design
+- `docs/plans/2025-12-11-tiled-home-screen-design.md`: Tiled home screen design
+- `docs/plans/2025-12-15-radio-mode-crash-fix-and-always-fresh-priority-design.md`: Radio Mode fixes and improvements
+
+#### Updated Documentation
+- `README.md`: Rebranded, updated features, added changelog
+- `CONTRIBUTING.md`: Updated for PodFlow
+- `CONTRIBUTORS.md`: PodFlow contributors
+
+**Files Removed:**
+- Cleaned up AntennaPod-specific documentation
+- Removed outdated READMEs from submodules
+
+### Testing
+
+#### New Tests
+- `app/src/test/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeViewModelTest.kt`
+  - Unit tests for TiledHomeViewModel
+
+#### Modified Tests
+- `app/src/androidTest/java/de/test/antennapod/ui/MainActivityTest.java`
+  - Updated for TiledHomeFragment as default
+
+### File Structure Summary
+
+**Total Files Changed:** 40+ files modified/created
+
+**Major Components:**
+- **Playback Service** (Radio Mode logic): 5 files
+- **UI Layer** (Tiled Home, Theme): 12 files
+- **Database/Storage** (Radio Mode queries): 3 files
+- **Download System** (Smart downloads): 2 files
+- **Preferences** (Settings): 3 files
+- **Documentation**: 5 files
+- **Build Config**: 3 files
+
+### Key Technical Decisions
+
+1. **Why Jetpack Compose for Tiled Home?**
+   - Modern, declarative UI
+   - Better performance for grid layouts
+   - Easier state management
+
+2. **Why Always-Fresh Playback Priority?**
+   - True "radio" experience prioritizes latest content
+   - Users who want sequential playback can use Queue
+   - Dynamic re-evaluation on every transition
+
+3. **Why 30s Default Crossfade?**
+   - Smooth transitions without being too long
+   - Balances seamlessness with user control
+   - Users can disable or adjust
+
+4. **Why Latest-Only Downloads?**
+   - Reduces storage usage
+   - Focuses on fresh content (radio philosophy)
+   - Same-day multi-episode support handles edge cases
+
+### Future Roadmap (Not Yet Implemented)
+
+- Smart algorithm to mix fresh + older unplayed content
+- User preference for "always fresh" vs "sequential" Radio Mode
+- Visual indicator showing "up next in Radio Mode"
+- Statistics/history of auto-played episodes
+- Hilt dependency injection migration
+
+---
+
 ## Technology Stack
 
 | Component | Technology |
