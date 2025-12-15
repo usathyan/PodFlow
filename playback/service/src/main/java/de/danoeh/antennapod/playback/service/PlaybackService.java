@@ -2149,28 +2149,40 @@ public class PlaybackService extends MediaBrowserServiceCompat {
 
         Log.d(TAG, "Fading out volume over " + durationMs + "ms");
 
-        // Run fade out on a background thread
+        // Capture the current mediaPlayer to avoid issues if it gets replaced during fade
+        final PlaybackServiceMediaPlayer currentPlayer = mediaPlayer;
+
+        // Run fade out on a background thread, but post volume changes to main thread
         new Thread(() -> {
             try {
                 long startTime = System.currentTimeMillis();
                 float initialVolume = 1.0f;
 
                 while (System.currentTimeMillis() - startTime < durationMs) {
-                    if (mediaPlayer == null) {
+                    if (currentPlayer == null) {
                         break;
                     }
 
                     long elapsed = System.currentTimeMillis() - startTime;
                     float progress = (float) elapsed / durationMs;
                     float newVolume = initialVolume * (1.0f - progress);
+                    final float volumeToSet = newVolume; // Make a final copy for lambda closure
 
-                    mediaPlayer.setVolume(newVolume, newVolume);
+                    // Post volume change to main thread
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (currentPlayer != null) {
+                            currentPlayer.setVolume(volumeToSet, volumeToSet);
+                        }
+                    });
                     Thread.sleep(50); // Update every 50ms for smooth fade
                 }
 
-                if (mediaPlayer != null) {
-                    mediaPlayer.setVolume(0.0f, 0.0f);
-                }
+                // Post final volume to main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (currentPlayer != null) {
+                        currentPlayer.setVolume(0.0f, 0.0f);
+                    }
+                });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -2184,35 +2196,54 @@ public class PlaybackService extends MediaBrowserServiceCompat {
      */
     private void fadeInVolume(long durationMs) {
         if (mediaPlayer == null || durationMs <= 0) {
-            mediaPlayer.setVolume(1.0f, 1.0f);
+            if (mediaPlayer != null) {
+                mediaPlayer.setVolume(1.0f, 1.0f);
+            }
             return;
         }
 
         Log.d(TAG, "Fading in volume over " + durationMs + "ms");
 
-        mediaPlayer.setVolume(0.0f, 0.0f);
+        // Capture the current mediaPlayer to avoid issues if it gets replaced during fade
+        final PlaybackServiceMediaPlayer currentPlayer = mediaPlayer;
 
-        // Run fade in on a background thread
+        // Post initial mute to main thread
+        new Handler(Looper.getMainLooper()).post(() -> {
+            if (currentPlayer != null) {
+                currentPlayer.setVolume(0.0f, 0.0f);
+            }
+        });
+
+        // Run fade in on a background thread, but post volume changes to main thread
         new Thread(() -> {
             try {
                 long startTime = System.currentTimeMillis();
 
                 while (System.currentTimeMillis() - startTime < durationMs) {
-                    if (mediaPlayer == null) {
+                    if (currentPlayer == null) {
                         break;
                     }
 
                     long elapsed = System.currentTimeMillis() - startTime;
                     float progress = (float) elapsed / durationMs;
                     float newVolume = progress;
+                    final float volumeToSet = newVolume; // Make a final copy for lambda closure
 
-                    mediaPlayer.setVolume(newVolume, newVolume);
+                    // Post volume change to main thread
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (currentPlayer != null) {
+                            currentPlayer.setVolume(volumeToSet, volumeToSet);
+                        }
+                    });
                     Thread.sleep(50); // Update every 50ms for smooth fade
                 }
 
-                if (mediaPlayer != null) {
-                    mediaPlayer.setVolume(1.0f, 1.0f);
-                }
+                // Post final volume to main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (currentPlayer != null) {
+                        currentPlayer.setVolume(1.0f, 1.0f);
+                    }
+                });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
