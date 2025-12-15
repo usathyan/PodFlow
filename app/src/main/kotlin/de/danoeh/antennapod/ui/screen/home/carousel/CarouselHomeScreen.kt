@@ -165,33 +165,32 @@ private fun CarouselContent(
 
     Column(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
-
         // Status text
         if (allCompleted) {
             Text(
                 text = "All caught up for today!",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
         } else {
             Text(
                 text = "Tap to play",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Horizontal carousel
+        // Horizontal carousel - large items
         LazyRow(
             state = listState,
-            contentPadding = PaddingValues(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             itemsIndexed(podcasts) { index, podcast ->
@@ -204,7 +203,7 @@ private fun CarouselContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Progress indicator dots
         CarouselDots(
@@ -240,12 +239,12 @@ private fun PodcastCarouselItem(
 
     Box(
         modifier = Modifier
-            .width(140.dp)
+            .width(280.dp)
             .aspectRatio(1f)
             .scale(scale)
             .alpha(alpha)
             .shadow(
-                elevation = if (isFocused) 12.dp else 6.dp,
+                elevation = if (isFocused) 16.dp else 8.dp,
                 shape = PodcastTileShape
             )
             .clip(PodcastTileShape)
@@ -293,8 +292,8 @@ private fun PlayOverlay() {
     ) {
         Surface(
             modifier = Modifier
-                .size(56.dp)
-                .shadow(8.dp, CircleShape),
+                .size(80.dp)
+                .shadow(12.dp, CircleShape),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary
         ) {
@@ -303,7 +302,7 @@ private fun PlayOverlay() {
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = "Play",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(48.dp)
                 )
             }
         }
@@ -321,22 +320,22 @@ private fun ProgressOverlay(progress: Float) {
         // Background circle
         CircularProgressIndicator(
             progress = { 1f },
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(96.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            strokeWidth = 4.dp
+            strokeWidth = 6.dp
         )
 
         // Progress circle
         CircularProgressIndicator(
             progress = { progress / 100f },
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(96.dp),
             color = MaterialTheme.colorScheme.primary,
-            strokeWidth = 4.dp
+            strokeWidth = 6.dp
         )
 
         // Play icon in center
         Surface(
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(72.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary
         ) {
@@ -345,7 +344,7 @@ private fun ProgressOverlay(progress: Float) {
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = "Resume",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(44.dp)
                 )
             }
         }
@@ -361,7 +360,7 @@ private fun CompletedOverlay() {
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(80.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
@@ -370,7 +369,7 @@ private fun CompletedOverlay() {
                     imageVector = Icons.Default.Check,
                     contentDescription = "Completed",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(48.dp)
                 )
             }
         }
