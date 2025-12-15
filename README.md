@@ -12,13 +12,17 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 - Volume normalization: Audio levels are equalized across different podcasts using Android's DynamicsProcessing API
 - Audio transitions: Configurable fade out/in when switching episodes (0s, 30s, 1m, 5m, 10m)
 - Skip outro integration: Crossfade timing respects per-podcast skip ending settings
+- Skip podcast controls: Dedicated buttons in player to jump to previous/next podcast
+- Wrap-around playback: Plays through all podcasts in sequence, loops back to start
 - Default behavior: Enabled on fresh installs
 
 **Home Screen**
-- Grid-based podcast view instead of episode list
-- Direct playback: Tap podcast tile to play latest downloaded episode
+- Horizontal carousel of podcast covers for quick visual selection
+- Direct playback: Tap any podcast cover to start playing
+- Visual states: Unplayed (full color), In-progress (progress ring), Completed (grayed out)
+- Session tracking: Completed podcasts gray out, progress persists across app restarts
+- Daily reset: Fresh session each day with all podcasts unplayed
 - Sorting: Podcasts ordered by latest episode date
-- Layout options: 2/3/auto column grid or list view
 - Implemented using Jetpack Compose
 
 **Download Behavior**
@@ -33,9 +37,10 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 
 | Feature | AntennaPod | PodFlow |
 |---------|------------|---------|
-| Home screen | Episode list | Podcast grid |
+| Home screen | Episode list | Horizontal podcast carousel |
 | Episode selection | Manual | Automatic (latest) |
-| Playback flow | Manual queue management | Automatic advancement |
+| Playback flow | Manual queue management | Automatic advancement with wrap-around |
+| Session tracking | None | Daily session with visual progress |
 | Download strategy | All new episodes | Latest episode per podcast |
 | Episode lifecycle | Manual deletion | Auto-delete after playback |
 | Volume handling | Per-episode manual boost | Automatic normalization |
@@ -113,31 +118,33 @@ This section documents all modifications made to the AntennaPod codebase to crea
   - Added blend time preference management (lines 975-985)
   - Added volume normalization preferences (lines 958-997)
 
-#### 2. **Tiled Home Screen** (`77104c903`, `280874a38`)
-- **Jetpack Compose UI**: Modern, grid-based podcast view
-- **One-tap play**: Each podcast tile has a play button to instantly start the latest episode
-- **Configurable layout**: 2/3/Auto columns, list/grid view toggle
+#### 2. **Carousel Home Screen** (`77104c903`, `280874a38`)
+- **Jetpack Compose UI**: Modern, horizontal carousel of podcast covers
+- **One-tap play**: Tap any podcast cover to instantly start the latest episode
+- **Visual states**: Unplayed (full color, play icon), In-progress (progress ring), Completed (grayed, checkmark)
+- **Session tracking**: Daily session persists completion state and playback position
+- **Daily reset**: Session automatically resets each day for fresh content
 - **Date sorting**: Podcasts sorted by latest episode date (newest first)
-- **Download badges**: Visual indicators showing downloaded episode count
 - **Set as default home page**: Replaces traditional episode-centric feed
 
 **Files Created:**
-- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeScreen.kt` (808 lines)
-  - Jetpack Compose UI implementation
-  - Grid/List view rendering
-  - Play button tap handling
-- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeViewModel.kt` (100 lines)
-  - ViewModel for managing podcast list state
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/carousel/CarouselHomeScreen.kt`
+  - Jetpack Compose UI with horizontal LazyRow
+  - Visual states for unplayed/in-progress/completed
+  - Progress indicator dots
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/carousel/CarouselHomeViewModel.kt`
+  - ViewModel for managing podcast list and session state
   - Sorting by latest episode date
-- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeFragment.kt` (45 lines)
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/carousel/CommuteSession.kt`
+  - Data model for daily session tracking
+  - Persistence via SharedPreferences
+- `app/src/main/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeFragment.kt`
   - Fragment wrapper for Compose UI
-- `app/src/test/kotlin/de/danoeh/antennapod/ui/screen/home/tiled/TiledHomeViewModelTest.kt` (134 lines)
-  - Unit tests for ViewModel
 
 **Files Modified:**
 - `app/src/main/java/de/danoeh/antennapod/activity/MainActivity.java`
   - Changed default home fragment to `TiledHomeFragment` (line 410-412)
-  - Added navigation support for tiled home
+  - Added navigation support for carousel home
 
 #### 3. **Smart Latest-Only Downloads** (`772aad2bd`, `1fce9c9bf`)
 - **One episode per podcast**: Auto-download only downloads the latest unplayed episode
@@ -339,8 +346,10 @@ app/src/main/kotlin/de/danoeh/antennapod/
 ├── ui/
 │   ├── theme/              # Material 3 theme (Color, Type, Shape, Theme)
 │   └── screen/
-│       ├── home/tiled/     # Tiled home screen
-│       ├── player/         # Now Playing screen
+│       ├── home/
+│       │   ├── carousel/   # Carousel home screen (CommuteSession, ViewModel, UI)
+│       │   └── tiled/      # Fragment wrapper
+│       ├── player/         # Now Playing screen (skip podcast buttons)
 │       └── discover/       # Discovery/Search screen
 ```
 

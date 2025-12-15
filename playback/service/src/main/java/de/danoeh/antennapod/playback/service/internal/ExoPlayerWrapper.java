@@ -522,7 +522,7 @@ public class ExoPlayerWrapper {
             if (dynamicsProcessing != null) {
                 try {
                     dynamicsProcessing.release();
-                } catch (Exception e) {
+                } catch (Exception ignored) {
                     // Expected if audio effect already released
                 }
                 dynamicsProcessing = null;
