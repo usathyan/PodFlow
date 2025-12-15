@@ -290,7 +290,7 @@ public final class DBReader {
      * This respects the "latest only" download philosophy where we only want to show
      * one new episode per podcast in the inbox.
      *
-     * Uses efficient SQL query to count distinct feeds with NEW episodes.
+     * <p>Uses efficient SQL query to count distinct feeds with NEW episodes.
      *
      * @return Count of new episodes (latest per podcast only)
      */
@@ -311,7 +311,7 @@ public final class DBReader {
      * Gets NEW episodes filtered to only include episodes from the latest date per podcast.
      * If a podcast has multiple new episodes from the same day, all are returned.
      *
-     * Uses efficient SQL query with subquery to find latest date per feed.
+     * <p>Uses efficient SQL query with subquery to find latest date per feed.
      *
      * @param offset Offset for pagination
      * @param limit Maximum number of episodes to return
@@ -548,7 +548,8 @@ public final class DBReader {
 
             // Check if same day
             if (targetCal.get(java.util.Calendar.YEAR) == episodeCal.get(java.util.Calendar.YEAR)
-                    && targetCal.get(java.util.Calendar.DAY_OF_YEAR) == episodeCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+                    && targetCal.get(java.util.Calendar.DAY_OF_YEAR)
+                        == episodeCal.get(java.util.Calendar.DAY_OF_YEAR)) {
                 loadAdditionalFeedItemListData(Collections.singletonList(episode));
                 return episode;
             }

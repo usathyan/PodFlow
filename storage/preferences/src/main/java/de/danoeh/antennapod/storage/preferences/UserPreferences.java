@@ -173,6 +173,7 @@ public abstract class UserPreferences {
         TWO(2), THREE(3), AUTO(0);
 
         public final int value;
+
         HomeGridColumns(int value) {
             this.value = value;
         }

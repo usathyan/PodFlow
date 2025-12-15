@@ -214,13 +214,17 @@ public class ExoPlayerWrapper {
         if (loudnessEnhancer != null) {
             try {
                 loudnessEnhancer.release();
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                // Expected if audio effect already released
+            }
             loudnessEnhancer = null;
         }
         if (dynamicsProcessing != null) {
             try {
                 dynamicsProcessing.release();
-            } catch (Exception ignored) { }
+            } catch (Exception e) {
+                // Expected if audio effect already released
+            }
             dynamicsProcessing = null;
         }
         audioSeekCompleteListener = null;
@@ -518,7 +522,9 @@ public class ExoPlayerWrapper {
             if (dynamicsProcessing != null) {
                 try {
                     dynamicsProcessing.release();
-                } catch (Exception ignored) { }
+                } catch (Exception e) {
+                    // Expected if audio effect already released
+                }
                 dynamicsProcessing = null;
             }
         }

@@ -55,8 +55,8 @@ public class AutomaticDownloadAlgorithm {
 
                 // Use a reasonable limit to avoid CursorWindow overflow
                 // 500 is enough to cover typical use cases while avoiding memory issues
-                final int MAX_EPISODES_TO_QUERY = 500;
-                final List<FeedItem> newItems = DBReader.getEpisodes(0, MAX_EPISODES_TO_QUERY,
+                final int maxEpisodesToQuery = 500;
+                final List<FeedItem> newItems = DBReader.getEpisodes(0, maxEpisodesToQuery,
                         new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
                 final List<FeedItem> candidates = new ArrayList<>();
                 for (FeedItem newItem : newItems) {

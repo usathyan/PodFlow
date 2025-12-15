@@ -1168,7 +1168,8 @@ public class PodDBAdapter {
         final String query = SELECT_FEED_ITEMS_AND_MEDIA
                 + " WHERE " + TABLE_NAME_FEED_ITEMS + "." + KEY_READ + " = " + FeedItem.NEW
                 + " AND date(" + TABLE_NAME_FEED_ITEMS + "." + KEY_PUBDATE + "/1000, 'unixepoch') = ("
-                + "   SELECT date(MAX(" + KEY_PUBDATE + ")/1000, 'unixepoch') FROM " + TABLE_NAME_FEED_ITEMS + " AS inner_items"
+                + "   SELECT date(MAX(" + KEY_PUBDATE + ")/1000, 'unixepoch') FROM "
+                + TABLE_NAME_FEED_ITEMS + " AS inner_items"
                 + "   WHERE inner_items." + KEY_FEED + " = " + TABLE_NAME_FEED_ITEMS + "." + KEY_FEED
                 + "   AND inner_items." + KEY_READ + " = " + FeedItem.NEW
                 + " )"
