@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.ui.screen.home.carousel
 
 import android.content.Context
+import androidx.core.content.edit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -90,10 +91,9 @@ data class CommuteSession(
          * Clear the stored session.
          */
         fun clear(context: Context) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .clear()
-                .apply()
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+                clear()
+            }
         }
     }
 
@@ -102,14 +102,14 @@ data class CommuteSession(
      */
     fun save(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit()
-            .putString(KEY_DATE, date)
-            .putString(KEY_PODCAST_ORDER, podcastOrder.joinToString(","))
-            .putString(KEY_COMPLETED, completedPodcasts.joinToString(","))
-            .putLong(KEY_CURRENT_PODCAST, currentPodcastId ?: -1L)
-            .putLong(KEY_CURRENT_EPISODE, currentEpisodeId ?: -1L)
-            .putLong(KEY_POSITION, currentPositionMs)
-            .apply()
+        prefs.edit {
+            putString(KEY_DATE, date)
+            putString(KEY_PODCAST_ORDER, podcastOrder.joinToString(","))
+            putString(KEY_COMPLETED, completedPodcasts.joinToString(","))
+            putLong(KEY_CURRENT_PODCAST, currentPodcastId ?: -1L)
+            putLong(KEY_CURRENT_EPISODE, currentEpisodeId ?: -1L)
+            putLong(KEY_POSITION, currentPositionMs)
+        }
     }
 
     /**

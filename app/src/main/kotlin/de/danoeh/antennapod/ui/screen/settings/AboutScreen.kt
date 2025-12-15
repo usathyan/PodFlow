@@ -1,8 +1,8 @@
 package de.danoeh.antennapod.ui.screen.settings
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.Image
+import androidx.core.net.toUri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -105,7 +105,7 @@ fun AboutScreen(
             item {
                 LinksSection(
                     onGitHubClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/AntennaPod/AntennaPod"))
+                        val intent = Intent(Intent.ACTION_VIEW, "https://github.com/AntennaPod/AntennaPod".toUri())
                         context.startActivity(intent)
                     },
                     onRateClick = {
@@ -113,7 +113,7 @@ fun AboutScreen(
                     },
                     onFeedbackClick = {
                         val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:feedback@podflow.app")
+                            data = "mailto:feedback@podflow.app".toUri()
                             putExtra(Intent.EXTRA_SUBJECT, "PodFlow Feedback")
                         }
                         context.startActivity(intent)
