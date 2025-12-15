@@ -117,7 +117,9 @@ public class HttpDownloader extends Downloader {
                 } else {
                     // File doesn't exist or is empty, but server says range is invalid
                     // Delete the partial file and let it retry from scratch
-                    destination.delete();
+                    if (!destination.delete()) {
+                        Log.w(TAG, "Failed to delete partial file: " + destination.getAbsolutePath());
+                    }
                     onFail(DownloadError.ERROR_HTTP_DATA_ERROR, "416 Range Not Satisfiable");
                 }
                 return;

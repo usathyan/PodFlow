@@ -10,7 +10,8 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 - Automatic playback: Episodes advance to the next podcast when finished
 - Automatic deletion: Played episodes are removed when the next episode from that podcast is downloaded
 - Volume normalization: Audio levels are equalized across different podcasts using Android's DynamicsProcessing API
-- Audio transitions: Configurable fade out/in when switching episodes (0s, 30s, 1m, 5m, 10m)
+- True crossfade: Both tracks play simultaneously during transitions using dual ExoPlayer instances
+- Configurable blend times: 0s, 30s, 1m, 5m, 10m crossfade durations
 - Skip outro integration: Crossfade timing respects per-podcast skip ending settings
 - Skip podcast controls: Dedicated buttons in player to jump to previous/next podcast
 - Wrap-around playback: Plays through all podcasts in sequence, loops back to start
@@ -40,6 +41,7 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 | Home screen | Episode list | Horizontal podcast carousel |
 | Episode selection | Manual | Automatic (latest) |
 | Playback flow | Manual queue management | Automatic advancement with wrap-around |
+| Audio transitions | None | True overlapping crossfade (dual-player) |
 | Session tracking | None | Daily session with visual progress |
 | Download strategy | All new episodes | Latest episode per podcast |
 | Episode lifecycle | Manual deletion | Auto-delete after playback |
@@ -54,11 +56,14 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 - Respects skip intro/outro settings per podcast
 - Crossfade starts before episode end time (accounting for skip outro)
 
-**Audio Crossfade Behavior**
-- Fade-out: Current episode volume gradually decreases over configured duration
-- Fade-in: Next episode starts at zero volume and increases over same duration
+**Audio Crossfade Behavior (True Overlapping Crossfade)**
+- Dual-player architecture: Secondary ExoPlayer instance loads next track during playback
+- Pre-loading: Next episode prepared 10 seconds before crossfade begins
+- Simultaneous playback: Both tracks play at the same time during crossfade
+- Volume crossfade: Current episode fades out (100%→0%) while next fades in (0%→100%)
 - Timing: Crossfade starts at (episode_end - skip_outro - crossfade_duration)
-- Implementation: Volume adjustments posted to main thread every 50ms
+- Implementation: RxJava interval updates volumes every 50ms for smooth transitions
+- Fallback: If next track isn't ready, falls back to sequential fade-out/skip/fade-in
 
 **Download Algorithm**
 - Queries for latest episode per subscribed podcast
@@ -96,19 +101,25 @@ This section documents all modifications made to the AntennaPod codebase to crea
 - **New playback mode** that auto-advances to the next podcast when an episode finishes
 - **Auto-deletion**: Episodes are automatically deleted after playback (smart deletion - only when next episode arrives)
 - **Volume normalization**: Real-time audio processing using Android's `LoudnessEnhancer` and `DynamicsProcessing` APIs
-- **Audio crossfade/blend**: Configurable fade times (0s, 30s, 1m, 5m, 10m) for smooth transitions between podcasts
+- **True overlapping crossfade**: Dual ExoPlayer architecture for simultaneous playback during transitions
+- **Configurable fade times**: 0s, 30s, 1m, 5m, 10m blend durations
 - **Skip behavior**: Skip button marks episode as listened and advances to next podcast (no deletion)
 - **Enabled by default**: Radio Mode is the default experience for new installs
 
 **Files Modified:**
 - `playback/service/src/main/java/de/danoeh/antennapod/playback/service/PlaybackService.java`
-  - Added Radio Mode playback logic at lines 1105-1298
+  - Added Radio Mode playback logic
   - Implemented `getNextInQueue()` override for Radio Mode
-  - Added blend/crossfade support on episode completion
+  - True crossfade with next track pre-loading (10s ahead)
   - Volume normalization integration
 - `playback/service/src/main/java/de/danoeh/antennapod/playback/service/internal/ExoPlayerWrapper.java`
+  - Dual ExoPlayer support for true overlapping crossfade
+  - `prepareNextForCrossfade()`: Pre-loads next track into secondary player
+  - `startCrossfade()`: Both tracks play simultaneously with volume cross-fading
+  - `completeCrossfade()`: Swaps players after transition completes
   - Integrated `LoudnessEnhancer` and `DynamicsProcessing` for volume normalization
-  - Auto-enables when Radio Mode is active
+- `playback/base/src/main/java/de/danoeh/antennapod/playback/base/PlaybackServiceMediaPlayer.java`
+  - Added crossfade method signatures for subclass implementations
 - `storage/database/src/main/java/de/danoeh/antennapod/storage/database/DBReader.java`
   - Added `getNextForRadioMode()` method (lines 499-522)
   - Added `getNextSameDayEpisode()` helper (lines 528-557)
