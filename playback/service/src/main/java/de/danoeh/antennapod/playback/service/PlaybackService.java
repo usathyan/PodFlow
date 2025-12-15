@@ -1107,7 +1107,12 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         // 2. Next podcast from home tiles
         if (UserPreferences.isRadioMode()) {
             Log.d(TAG, "Radio Mode: Getting next item using Radio Mode logic");
-            nextItem = DBReader.getNextForRadioMode(item);
+            try {
+                nextItem = DBReader.getNextForRadioMode(item);
+            } catch (Exception e) {
+                Log.e(TAG, "Error in Radio Mode getNextForRadioMode, falling back to standard queue", e);
+                nextItem = DBReader.getNextInQueue(item);
+            }
         } else {
             // Standard queue-based navigation
             nextItem = DBReader.getNextInQueue(item);
@@ -1133,16 +1138,18 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             Log.d(TAG, "getNextInQueue(), but continuous playback not enabled.");
             PlaybackPreferences.writeMediaPlaying(nextItem.getMedia());
             // Note: updateNotificationAndMediaSession must be called on main thread
+            final FeedItem finalNextItem = nextItem;
             new Handler(Looper.getMainLooper()).post(() ->
-                    updateNotificationAndMediaSession(nextItem.getMedia()));
+                    updateNotificationAndMediaSession(finalNextItem.getMedia()));
             return null;
         }
 
         if (!nextItem.getMedia().localFileAvailable() && !NetworkUtils.isStreamingAllowed()
                 && !nextItem.getFeed().isLocalFeed()) {
+            final FeedItem finalNextItem = nextItem;
             new Handler(Looper.getMainLooper()).post(() -> {
                 displayStreamingNotAllowedNotification(
-                        new PlaybackServiceStarter(this, nextItem.getMedia())
+                        new PlaybackServiceStarter(this, finalNextItem.getMedia())
                                 .getIntent());
                 stateManager.stopService();
             });
