@@ -1011,4 +1011,9 @@
 
     <string name="echo_share_heading">My favorite podcasts</string>
     <string name="echo_share">My year %d in podcasts. #PodFlowRewind</string>
+
+    <!-- Radio Mode -->
+    <string name="radio_mode">Radio Mode</string>
+    <string name="pref_radio_mode_blend_time_title">Audio crossfade/blend</string>
+    <string name="pref_radio_mode_blend_time_summary">Smooth fade between podcasts when advancing</string>
 </resources>
