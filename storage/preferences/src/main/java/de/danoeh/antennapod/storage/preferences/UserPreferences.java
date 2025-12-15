@@ -70,6 +70,7 @@ public abstract class UserPreferences {
 
     // Radio Mode Settings
     public static final String PREF_RADIO_MODE = "prefRadioMode";
+    public static final String PREF_RADIO_MODE_BLEND_TIME = "prefRadioModeBlendTime";
     public static final String PREF_AUTO_NORMALIZE_VOLUME = "prefAutoNormalizeVolume";
 
     public static final String PREF_GLOBAL_DEFAULT_SORTED_ORDER = "prefGlobalDefaultSortedOrder";
@@ -957,15 +958,30 @@ public abstract class UserPreferences {
     // Radio Mode Preferences
 
     /**
-     * Radio Mode: Enables seamless listening experience with auto-delete after playback,
-     * auto-advance to next episode, and automatic volume normalization.
+     * Radio Mode: Enables seamless listening experience with auto-advance to next podcast,
+     * and automatic volume normalization. Episodes are deleted only when next episode drops.
+     * Default is ON for PodFlow's radio-like experience.
      */
     public static boolean isRadioMode() {
-        return prefs.getBoolean(PREF_RADIO_MODE, false);
+        return prefs.getBoolean(PREF_RADIO_MODE, true);  // Default ON for PodFlow
     }
 
     public static void setRadioMode(boolean enabled) {
         prefs.edit().putBoolean(PREF_RADIO_MODE, enabled).apply();
+    }
+
+    /**
+     * Gets the Radio Mode blend/crossfade time in milliseconds.
+     * Options: 0 (no blend), 30000 (30s), 60000 (1m), 300000 (5m), 600000 (10m)
+     * Default: 0 (no blend)
+     */
+    public static int getRadioModeBlendTimeMs() {
+        int blendTimeMs = prefs.getInt(PREF_RADIO_MODE_BLEND_TIME, 0);  // Default 0 (no blend)
+        return Math.max(0, blendTimeMs);
+    }
+
+    public static void setRadioModeBlendTimeMs(int blendTimeMs) {
+        prefs.edit().putInt(PREF_RADIO_MODE_BLEND_TIME, blendTimeMs).apply();
     }
 
     /**

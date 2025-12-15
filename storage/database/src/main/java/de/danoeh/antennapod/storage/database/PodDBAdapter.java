@@ -1148,6 +1148,35 @@ public class PodDBAdapter {
         return db.rawQuery(query, null);
     }
 
+    /**
+     * Gets total count of NEW episodes across all feeds.
+     * Used for displaying the inbox badge count (total number of unread episodes).
+     */
+    public final Cursor getDistinctFeedsWithNewEpisodesCountCursor() {
+        final String query = "SELECT COUNT(*) FROM " + TABLE_NAME_FEED_ITEMS
+                + " WHERE " + KEY_READ + " = " + FeedItem.NEW;
+        return db.rawQuery(query, null);
+    }
+
+    /**
+     * Gets NEW episodes, but only the latest ones per feed (by date).
+     * If a feed has multiple episodes from the same day, all are returned.
+     * Uses SQLite date() function to compare dates at day granularity.
+     */
+    public final Cursor getLatestNewEpisodesPerFeedCursor(int offset, int limit) {
+        // Get NEW episodes where the date matches the latest date for that feed's NEW episodes
+        final String query = SELECT_FEED_ITEMS_AND_MEDIA
+                + " WHERE " + TABLE_NAME_FEED_ITEMS + "." + KEY_READ + " = " + FeedItem.NEW
+                + " AND date(" + TABLE_NAME_FEED_ITEMS + "." + KEY_PUBDATE + "/1000, 'unixepoch') = ("
+                + "   SELECT date(MAX(" + KEY_PUBDATE + ")/1000, 'unixepoch') FROM " + TABLE_NAME_FEED_ITEMS + " AS inner_items"
+                + "   WHERE inner_items." + KEY_FEED + " = " + TABLE_NAME_FEED_ITEMS + "." + KEY_FEED
+                + "   AND inner_items." + KEY_READ + " = " + FeedItem.NEW
+                + " )"
+                + " ORDER BY " + TABLE_NAME_FEED_ITEMS + "." + KEY_PUBDATE + " DESC"
+                + " LIMIT " + offset + ", " + limit;
+        return db.rawQuery(query, null);
+    }
+
     public Cursor getRandomEpisodesCursor(int limit, int seed) {
         long oneHourAgo = System.currentTimeMillis() - 1000L * 3600L;
         final String allItems = SELECT_FEED_ITEMS_AND_MEDIA

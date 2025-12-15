@@ -79,6 +79,11 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
@@ -1062,7 +1067,22 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         }
     }
 
+    private static final ExecutorService dbExecutor = Executors.newSingleThreadExecutor();
+
     private Playable getNextInQueue(final Playable currentMedia) {
+        // Run database operations on a background thread to avoid StrictMode violations
+        // The method needs to return synchronously, so we use a Future with blocking get()
+        Future<Playable> future = dbExecutor.submit(() -> getNextInQueueInternal(currentMedia));
+        try {
+            return future.get(5, TimeUnit.SECONDS);
+        } catch (ExecutionException | InterruptedException | java.util.concurrent.TimeoutException e) {
+            Log.e(TAG, "Error getting next in queue", e);
+            PlaybackPreferences.writeNoMediaPlaying();
+            return null;
+        }
+    }
+
+    private Playable getNextInQueueInternal(final Playable currentMedia) {
         if (!(currentMedia instanceof FeedMedia)) {
             Log.d(TAG, "getNextInQueue(), but playable not an instance of FeedMedia, so not proceeding");
             PlaybackPreferences.writeNoMediaPlaying();
@@ -1079,32 +1099,54 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             PlaybackPreferences.writeNoMediaPlaying();
             return null;
         }
+
         FeedItem nextItem;
-        nextItem = DBReader.getNextInQueue(item);
+
+        // Radio Mode: Use special logic to get next item
+        // 1. Same-day episode from same podcast, or
+        // 2. Next podcast from home tiles
+        if (UserPreferences.isRadioMode()) {
+            Log.d(TAG, "Radio Mode: Getting next item using Radio Mode logic");
+            nextItem = DBReader.getNextForRadioMode(item);
+        } else {
+            // Standard queue-based navigation
+            nextItem = DBReader.getNextInQueue(item);
+        }
 
         if (nextItem == null || nextItem.getMedia() == null) {
+            Log.d(TAG, "No next item found");
             PlaybackPreferences.writeNoMediaPlaying();
             return null;
         }
 
-        // continue playback if user has enabled continuous playback
-        // OR they enabled an episode sleep timer and there are still episodes left to play
-        final boolean continuousPlayback = UserPreferences.isFollowQueue() && shouldContinueToNextEpisode();
+        // Radio Mode always continues (seamless radio experience)
+        // Non-Radio Mode requires Follow Queue and continuous playback settings
+        final boolean continuousPlayback;
+        if (UserPreferences.isRadioMode()) {
+            continuousPlayback = shouldContinueToNextEpisode();  // Only check sleep timer
+            Log.d(TAG, "Radio Mode: Continuous playback = " + continuousPlayback);
+        } else {
+            continuousPlayback = UserPreferences.isFollowQueue() && shouldContinueToNextEpisode();
+        }
 
         if (!continuousPlayback) {
-            Log.d(TAG, "getNextInQueue(), but follow queue is not enabled.");
+            Log.d(TAG, "getNextInQueue(), but continuous playback not enabled.");
             PlaybackPreferences.writeMediaPlaying(nextItem.getMedia());
-            updateNotificationAndMediaSession(nextItem.getMedia());
+            // Note: updateNotificationAndMediaSession must be called on main thread
+            new Handler(Looper.getMainLooper()).post(() ->
+                    updateNotificationAndMediaSession(nextItem.getMedia()));
             return null;
         }
 
         if (!nextItem.getMedia().localFileAvailable() && !NetworkUtils.isStreamingAllowed()
-                && UserPreferences.isFollowQueue() && !nextItem.getFeed().isLocalFeed()) {
-            displayStreamingNotAllowedNotification(
-                    new PlaybackServiceStarter(this, nextItem.getMedia())
-                            .getIntent());
+                && !nextItem.getFeed().isLocalFeed()) {
+            new Handler(Looper.getMainLooper()).post(() -> {
+                displayStreamingNotAllowedNotification(
+                        new PlaybackServiceStarter(this, nextItem.getMedia())
+                                .getIntent());
+                stateManager.stopService();
+            });
             PlaybackPreferences.writeNoMediaPlaying();
-            stateManager.stopService();
             return null;
         }
         return nextItem.getMedia();
@@ -1203,6 +1245,15 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             autoSkipped = true;
         }
 
+        // Handle Radio Mode blend/crossfade when episode ends
+        if ((ended || almostEnded) && UserPreferences.isRadioMode()) {
+            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
+            if (blendTimeMs > 0) {
+                Log.d(TAG, "Radio Mode: Applying blend effect (" + blendTimeMs + "ms) at end of episode");
+                fadeOutVolume(blendTimeMs);
+            }
+        }
+
         if (ended || almostEnded) {
             SynchronizationQueue.getInstance().enqueueEpisodePlayed(media, true);
             media.onPlaybackCompleted(getApplicationContext());
@@ -1220,19 +1271,26 @@ public class PlaybackService extends MediaBrowserServiceCompat {
                 DBWriter.markItemPlayed(item, FeedItem.PLAYED, ended || (skipped && almostEnded));
                 // don't know if it actually matters to not autodownload when smart mark as played is triggered
                 DBWriter.removeQueueItem(PlaybackService.this, ended, item);
-                // Delete episode if enabled (or if Radio Mode is on)
-                FeedPreferences.AutoDeleteAction action =
-                        item.getFeed().getPreferences().getCurrentAutoDelete();
-                boolean autoDeleteEnabledGlobally = UserPreferences.isAutoDelete()
-                        && (!item.getFeed().isLocalFeed() || UserPreferences.isAutoDeleteLocal());
+
+                // Delete episode logic:
+                // - In Radio Mode: DON'T delete here - deletion happens when next episode drops
+                // - Otherwise: Use existing auto-delete preferences
                 boolean radioModeEnabled = UserPreferences.isRadioMode();
-                boolean shouldAutoDelete = radioModeEnabled
-                        || action == FeedPreferences.AutoDeleteAction.ALWAYS
-                        || (action == FeedPreferences.AutoDeleteAction.GLOBAL && autoDeleteEnabledGlobally);
-                if (shouldAutoDelete && (!item.isTagged(FeedItem.TAG_FAVORITE)
-                        || !UserPreferences.shouldFavoriteKeepEpisode())) {
-                    DBWriter.deleteFeedMediaOfItem(PlaybackService.this, media);
-                    Log.d(TAG, "Episode Deleted" + (radioModeEnabled ? " (Radio Mode)" : ""));
+                if (!radioModeEnabled) {
+                    // Only auto-delete if NOT in Radio Mode (Radio Mode defers deletion)
+                    FeedPreferences.AutoDeleteAction action =
+                            item.getFeed().getPreferences().getCurrentAutoDelete();
+                    boolean autoDeleteEnabledGlobally = UserPreferences.isAutoDelete()
+                            && (!item.getFeed().isLocalFeed() || UserPreferences.isAutoDeleteLocal());
+                    boolean shouldAutoDelete = action == FeedPreferences.AutoDeleteAction.ALWAYS
+                            || (action == FeedPreferences.AutoDeleteAction.GLOBAL && autoDeleteEnabledGlobally);
+                    if (shouldAutoDelete && (!item.isTagged(FeedItem.TAG_FAVORITE)
+                            || !UserPreferences.shouldFavoriteKeepEpisode())) {
+                        DBWriter.deleteFeedMediaOfItem(PlaybackService.this, media);
+                        Log.d(TAG, "Episode Deleted (Auto-delete enabled)");
+                    }
+                } else {
+                    Log.d(TAG, "Radio Mode: Episode kept until next episode drops");
                 }
                 notifyChildrenChanged(getString(R.string.queue_label));
             }
@@ -2078,4 +2136,86 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             }
         }
     };
+
+    /**
+     * Fade out the current episode during Radio Mode blend transition.
+     * This reduces volume gradually from current level to 0 over the specified duration.
+     * Used to create a smoother transition when advancing to the next episode in Radio Mode.
+     */
+    private void fadeOutVolume(long durationMs) {
+        if (mediaPlayer == null || durationMs <= 0) {
+            return;
+        }
+
+        Log.d(TAG, "Fading out volume over " + durationMs + "ms");
+
+        // Run fade out on a background thread
+        new Thread(() -> {
+            try {
+                long startTime = System.currentTimeMillis();
+                float initialVolume = 1.0f;
+
+                while (System.currentTimeMillis() - startTime < durationMs) {
+                    if (mediaPlayer == null) {
+                        break;
+                    }
+
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    float progress = (float) elapsed / durationMs;
+                    float newVolume = initialVolume * (1.0f - progress);
+
+                    mediaPlayer.setVolume(newVolume, newVolume);
+                    Thread.sleep(50); // Update every 50ms for smooth fade
+                }
+
+                if (mediaPlayer != null) {
+                    mediaPlayer.setVolume(0.0f, 0.0f);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+    }
+
+    /**
+     * Fade in the current episode during Radio Mode blend transition.
+     * This increases volume gradually from 0 to full volume over the specified duration.
+     * Used to create a smoother transition when advancing to the next episode in Radio Mode.
+     */
+    private void fadeInVolume(long durationMs) {
+        if (mediaPlayer == null || durationMs <= 0) {
+            mediaPlayer.setVolume(1.0f, 1.0f);
+            return;
+        }
+
+        Log.d(TAG, "Fading in volume over " + durationMs + "ms");
+
+        mediaPlayer.setVolume(0.0f, 0.0f);
+
+        // Run fade in on a background thread
+        new Thread(() -> {
+            try {
+                long startTime = System.currentTimeMillis();
+
+                while (System.currentTimeMillis() - startTime < durationMs) {
+                    if (mediaPlayer == null) {
+                        break;
+                    }
+
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    float progress = (float) elapsed / durationMs;
+                    float newVolume = progress;
+
+                    mediaPlayer.setVolume(newVolume, newVolume);
+                    Thread.sleep(50); // Update every 50ms for smooth fade
+                }
+
+                if (mediaPlayer != null) {
+                    mediaPlayer.setVolume(1.0f, 1.0f);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+    }
 }

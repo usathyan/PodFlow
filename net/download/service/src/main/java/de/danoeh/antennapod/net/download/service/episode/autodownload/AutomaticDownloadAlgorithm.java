@@ -53,7 +53,10 @@ public class AutomaticDownloadAlgorithm {
 
                 Log.d(TAG, "Performing auto-dl of undownloaded episodes");
 
-                final List<FeedItem> newItems = DBReader.getEpisodes(0, Integer.MAX_VALUE,
+                // Use a reasonable limit to avoid CursorWindow overflow
+                // 500 is enough to cover typical use cases while avoiding memory issues
+                final int MAX_EPISODES_TO_QUERY = 500;
+                final List<FeedItem> newItems = DBReader.getEpisodes(0, MAX_EPISODES_TO_QUERY,
                         new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
                 final List<FeedItem> candidates = new ArrayList<>();
                 for (FeedItem newItem : newItems) {
@@ -83,6 +86,15 @@ public class AutomaticDownloadAlgorithm {
                             || !item.hasMedia()
                             || item.getFeed().isLocalFeed()) {
                         it.remove();
+                    } else {
+                        // Also filter out episodes that are already downloading or queued
+                        String downloadUrl = item.getMedia().getDownloadUrl();
+                        if (downloadUrl != null && (
+                                DownloadServiceInterface.get().isDownloadingEpisode(downloadUrl)
+                                || DownloadServiceInterface.get().isEpisodeQueued(downloadUrl))) {
+                            Log.d(TAG, "Skipping already queued/downloading episode: " + item.getTitle());
+                            it.remove();
+                        }
                     }
                 }
 

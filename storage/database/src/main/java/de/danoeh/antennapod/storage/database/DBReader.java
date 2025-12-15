@@ -290,103 +290,43 @@ public final class DBReader {
      * This respects the "latest only" download philosophy where we only want to show
      * one new episode per podcast in the inbox.
      *
+     * Uses efficient SQL query to count distinct feeds with NEW episodes.
+     *
      * @return Count of new episodes (latest per podcast only)
      */
     public static int getLatestNewEpisodeCount() {
-        List<FeedItem> latestNewEpisodes = getLatestNewEpisodes();
-        return latestNewEpisodes.size();
-    }
-
-    /**
-     * Gets NEW episodes filtered to only include the latest episode per podcast.
-     * If a podcast has multiple new episodes, only the most recent one is returned.
-     *
-     * @return List of the latest new episode from each podcast
-     */
-    public static List<FeedItem> getLatestNewEpisodes() {
-        List<FeedItem> allNewEpisodes = getEpisodes(0, Integer.MAX_VALUE,
-                new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
-
-        // Group by feed and keep only the latest per feed
-        Map<Long, FeedItem> latestPerFeed = new HashMap<>();
-        for (FeedItem item : allNewEpisodes) {
-            long feedId = item.getFeedId();
-            if (!latestPerFeed.containsKey(feedId)) {
-                // First (and latest due to sort order) episode for this feed
-                latestPerFeed.put(feedId, item);
-            } else {
-                // Check if this episode is from the same day as the latest
-                // If so, include it too (handles same-day multi-episode drops)
-                FeedItem existing = latestPerFeed.get(feedId);
-                if (existing.getPubDate() != null && item.getPubDate() != null
-                        && isSameDay(existing.getPubDate(), item.getPubDate())) {
-                    // Same day - we need to track multiple, but for count we just need 1
-                    // For the list version, we'll handle this differently
-                }
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getDistinctFeedsWithNewEpisodesCountCursor()) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0);
             }
+            return 0;
+        } finally {
+            adapter.close();
         }
-
-        return new ArrayList<>(latestPerFeed.values());
     }
 
     /**
      * Gets NEW episodes filtered to only include episodes from the latest date per podcast.
      * If a podcast has multiple new episodes from the same day, all are returned.
      *
+     * Uses efficient SQL query with subquery to find latest date per feed.
+     *
      * @param offset Offset for pagination
      * @param limit Maximum number of episodes to return
-     * @param sortOrder Sort order for results
+     * @param sortOrder Sort order for results (currently ignored, sorted by date DESC)
      * @return List of new episodes (latest date per podcast)
      */
     public static List<FeedItem> getLatestNewEpisodesWithSameDay(int offset, int limit, SortOrder sortOrder) {
-        List<FeedItem> allNewEpisodes = getEpisodes(0, Integer.MAX_VALUE,
-                new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
-
-        // Group by feed and find latest date per feed
-        Map<Long, java.util.Date> latestDatePerFeed = new HashMap<>();
-        for (FeedItem item : allNewEpisodes) {
-            long feedId = item.getFeedId();
-            java.util.Date pubDate = item.getPubDate();
-            if (pubDate != null) {
-                if (!latestDatePerFeed.containsKey(feedId) || pubDate.after(latestDatePerFeed.get(feedId))) {
-                    latestDatePerFeed.put(feedId, pubDate);
-                }
-            }
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (FeedItemCursor cursor = new FeedItemCursor(
+                adapter.getLatestNewEpisodesPerFeedCursor(offset, limit))) {
+            return extractItemlistFromCursor(cursor);
+        } finally {
+            adapter.close();
         }
-
-        // Filter to only include episodes from the latest date per feed
-        List<FeedItem> result = new ArrayList<>();
-        for (FeedItem item : allNewEpisodes) {
-            long feedId = item.getFeedId();
-            java.util.Date latestDate = latestDatePerFeed.get(feedId);
-            if (latestDate != null && item.getPubDate() != null
-                    && isSameDay(item.getPubDate(), latestDate)) {
-                result.add(item);
-            } else if (latestDate == null && item.getPubDate() == null) {
-                // No dates - include the first one per feed
-                if (!latestDatePerFeed.containsKey(feedId)) {
-                    result.add(item);
-                    latestDatePerFeed.put(feedId, null);
-                }
-            }
-        }
-
-        // Apply pagination
-        int start = Math.min(offset, result.size());
-        int end = Math.min(offset + limit, result.size());
-        return result.subList(start, end);
-    }
-
-    private static boolean isSameDay(java.util.Date date1, java.util.Date date2) {
-        if (date1 == null || date2 == null) {
-            return false;
-        }
-        java.util.Calendar cal1 = java.util.Calendar.getInstance();
-        java.util.Calendar cal2 = java.util.Calendar.getInstance();
-        cal1.setTime(date1);
-        cal2.setTime(date2);
-        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
-                && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
     }
 
     public static int getFeedEpisodeCount(long feedId, FeedItemFilter filter) {
@@ -545,6 +485,120 @@ public final class DBReader {
         } finally {
             adapter.close();
         }
+    }
+
+    /**
+     * Radio Mode: Get the next item to play based on Radio Mode logic:
+     * 1. If there's another same-day episode from the same podcast, play it
+     * 2. Otherwise, get the next podcast from home tiles (downloaded, unplayed)
+     *
+     * @param currentItem The currently playing FeedItem
+     * @return The next FeedItem to play, or null if none available
+     */
+    @Nullable
+    public static FeedItem getNextForRadioMode(FeedItem currentItem) {
+        if (currentItem == null || currentItem.getFeed() == null) {
+            return null;
+        }
+
+        long currentFeedId = currentItem.getFeedId();
+        java.util.Date currentPubDate = currentItem.getPubDate();
+
+        // Step 1: Check for another same-day episode from the same podcast
+        if (currentPubDate != null) {
+            FeedItem sameDayEpisode = getNextSameDayEpisode(currentFeedId, currentItem.getId(), currentPubDate);
+            if (sameDayEpisode != null) {
+                Log.d(TAG, "Radio Mode: Found same-day episode from same podcast: " + sameDayEpisode.getTitle());
+                return sameDayEpisode;
+            }
+        }
+
+        // Step 2: Get the next podcast from home tiles (downloaded, unplayed episodes)
+        FeedItem nextPodcastEpisode = getNextPodcastEpisode(currentFeedId);
+        if (nextPodcastEpisode != null) {
+            Log.d(TAG, "Radio Mode: Advancing to next podcast: " + nextPodcastEpisode.getFeed().getTitle());
+        }
+        return nextPodcastEpisode;
+    }
+
+    /**
+     * Get the next same-day episode from the same feed that is unplayed and downloaded.
+     */
+    @Nullable
+    private static FeedItem getNextSameDayEpisode(long feedId, long currentItemId, java.util.Date pubDate) {
+        // Get all downloaded, unplayed episodes from this feed
+        List<FeedItem> episodes = getFeedItemList(getFeed(feedId, false, 0, Integer.MAX_VALUE),
+                new FeedItemFilter(FeedItemFilter.DOWNLOADED, FeedItemFilter.UNPLAYED),
+                SortOrder.DATE_NEW_OLD, 0, Integer.MAX_VALUE);
+
+        // Find episodes from the same day
+        java.util.Calendar targetCal = java.util.Calendar.getInstance();
+        targetCal.setTime(pubDate);
+
+        for (FeedItem episode : episodes) {
+            if (episode.getId() == currentItemId) {
+                continue; // Skip current episode
+            }
+            if (episode.getPubDate() == null) {
+                continue;
+            }
+
+            java.util.Calendar episodeCal = java.util.Calendar.getInstance();
+            episodeCal.setTime(episode.getPubDate());
+
+            // Check if same day
+            if (targetCal.get(java.util.Calendar.YEAR) == episodeCal.get(java.util.Calendar.YEAR)
+                    && targetCal.get(java.util.Calendar.DAY_OF_YEAR) == episodeCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+                loadAdditionalFeedItemListData(Collections.singletonList(episode));
+                return episode;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get the next podcast's latest downloaded episode from home tiles.
+     * This finds a different podcast's latest unplayed, downloaded episode.
+     */
+    @Nullable
+    private static FeedItem getNextPodcastEpisode(long currentFeedId) {
+        // Get all feeds
+        List<Feed> feeds = getFeedList();
+
+        // Sort by some order (e.g., title or last played)
+        Collections.sort(feeds, (a, b) -> {
+            String titleA = a.getTitle() != null ? a.getTitle() : "";
+            String titleB = b.getTitle() != null ? b.getTitle() : "";
+            return titleA.compareToIgnoreCase(titleB);
+        });
+
+        // Find the current feed's position and get the next one
+        int currentIndex = -1;
+        for (int i = 0; i < feeds.size(); i++) {
+            if (feeds.get(i).getId() == currentFeedId) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        // Start from next feed and wrap around
+        for (int offset = 1; offset <= feeds.size(); offset++) {
+            int nextIndex = (currentIndex + offset) % feeds.size();
+            Feed nextFeed = feeds.get(nextIndex);
+
+            // Get downloaded, unplayed episodes from this feed
+            List<FeedItem> episodes = getFeedItemList(nextFeed,
+                    new FeedItemFilter(FeedItemFilter.DOWNLOADED, FeedItemFilter.UNPLAYED),
+                    SortOrder.DATE_NEW_OLD, 0, 1);
+
+            if (!episodes.isEmpty()) {
+                FeedItem episode = episodes.get(0);
+                loadAdditionalFeedItemListData(episodes);
+                return episode;
+            }
+        }
+
+        return null;
     }
 
     @NonNull

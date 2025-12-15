@@ -4,6 +4,18 @@
 
 PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) redesigned for a **radio-like listening experience**. Instead of managing individual episodes, PodFlow focuses on automatic playback with minimal interaction - just pick a podcast and listen.
 
+## Latest Updates (v1.0.0)
+
+**Radio Mode Enhancements:**
+- ✅ **Radio Mode enabled by default** - Seamless listening experience out of the box
+- ✅ **Fixed inbox count** - Now shows total NEW episodes, not just podcast count
+- ✅ **Smart episode downloads** - Only downloads latest episode per podcast
+- ✅ **Seamless podcast transitions** - Auto-advance to next podcast with optional audio blending
+- ✅ **Audio crossfade/blend** - Configure fade time (0s, 30s, 1m, 5m, 10m) for smooth transitions between podcasts
+- ✅ **Skip behavior fixed** - Skip marks episode as listened, advances to next podcast (no delete)
+- ✅ **Smart deletion** - Episodes only deleted when next episode of same podcast arrives
+- ✅ **HTTP 416 handling** - Download system properly handles already-downloaded files
+
 ---
 
 ## How PodFlow Differs from AntennaPod
@@ -19,11 +31,17 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) rede
 
 ### Key PodFlow Features
 
-- **Radio Mode** - Enable from home screen menu. Episodes auto-delete after playback and volume is normalized across all podcasts for seamless listening.
-- **Smart Latest-Only Downloads** - Only downloads the most recent episode from each podcast. If a podcast drops multiple episodes on the same day, all are downloaded.
+- **Radio Mode** (Enabled by Default) - Episodes auto-delete after playback and volume is normalized across all podcasts for seamless listening. Configure audio blend/crossfade when transitioning between podcasts.
+- **Audio Blending/Crossfade** - When advancing to the next podcast, optionally fade out the current episode and fade in the next over your choice of duration:
+  - **No Blend** - Instant transition
+  - **30 seconds** - Quick fade
+  - **1 minute** - Standard crossfade
+  - **5 minutes** - Extended blend
+  - **10 minutes** - Slow, smooth transition
+- **Smart Latest-Only Downloads** - Only downloads the most recent episode from each podcast. If a podcast drops multiple episodes on the same day, all are downloaded. Never re-downloads already-downloaded files.
 - **Tiled Home Screen** - Visual grid of your podcasts. Tap to play instantly. Configurable 2/3/Auto columns with list view option.
 - **Real-Time Volume Normalization** - Uses Android's DynamicsProcessing API to compress and limit audio, ensuring consistent volume across different podcasts.
-- **Smart Inbox** - Shows only the latest new episode per podcast, not all accumulated episodes.
+- **Smart Inbox** - Shows total count of all new episodes across all podcasts. Swipe to mark as listened and auto-advance to next podcast.
 
 ### App Navigation
 
