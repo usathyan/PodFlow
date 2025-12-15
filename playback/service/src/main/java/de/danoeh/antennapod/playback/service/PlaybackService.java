@@ -1395,51 +1395,22 @@ public class PlaybackService extends MediaBrowserServiceCompat {
                         Log.d(TAG, "Radio Mode: Crossfade player ready, starting overlapping crossfade");
                         final FeedMedia currentMedia = feedMedia;
                         final FeedItem nextItem = nextItemForCrossfade;
-
-                        mediaPlayer.startCrossfade(blendTimeMs, () -> {
-                            // Crossfade complete - update playback state
-                            Log.d(TAG, "Radio Mode: Crossfade complete, updating playback state");
-                            new Handler(Looper.getMainLooper()).post(() -> {
-                                if (nextItem != null && nextItem.getMedia() != null) {
-                                    this.autoSkippedFeedMediaId = currentMedia.getItem().getIdentifyingValue();
-
-                                    // Update media references and notify UI
-                                    FeedMedia nextMedia = nextItem.getMedia();
-                                    PlaybackPreferences.writeMediaPlaying(nextMedia);
-                                    updateNotificationAndMediaSession(nextMedia);
-
-                                    // Reset crossfade flags for the new episode
-                                    crossfadeStarted = false;
-                                    crossfadePrepared = false;
-                                    nextItemForCrossfade = null;
-
-                                    // Apply Radio Mode fade-in for any residual adjustment
-                                    // (crossfade already handled the volume, but ensure full volume)
-                                    if (mediaPlayer != null) {
-                                        mediaPlayer.setVolume(1.0f, 1.0f);
-                                    }
-
-                                    // Mark previous episode as completed
-                                    currentMedia.onPlaybackCompleted(getApplicationContext());
-                                    SynchronizationQueue.getInstance().enqueueEpisodePlayed(currentMedia, true);
-                                }
-                            });
-                        });
-                        return;
-                    } else {
-                        // Fallback to old fade-out behavior if crossfade not ready
-                        Log.d(TAG, "Radio Mode: Crossfade not ready, falling back to fade-out/skip");
-                        fadeOutVolume(blendTimeMs);
-
-                        // Schedule the skip to happen after fade completes
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            if (mediaPlayer != null && mediaPlayer.getPlayable() == playable) {
-                                this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
-                                mediaPlayer.skip();
-                            }
-                        }, blendTimeMs);
+                        mediaPlayer.startCrossfade(blendTimeMs,
+                                () -> onCrossfadeComplete(currentMedia, nextItem));
                         return;
                     }
+                    // Fallback to old fade-out behavior if crossfade not ready
+                    Log.d(TAG, "Radio Mode: Crossfade not ready, falling back to fade-out/skip");
+                    fadeOutVolume(blendTimeMs);
+
+                    // Schedule the skip to happen after fade completes
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        if (mediaPlayer != null && mediaPlayer.getPlayable() == playable) {
+                            this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
+                            mediaPlayer.skip();
+                        }
+                    }, blendTimeMs);
+                    return;
                 }
             }
         }
@@ -1527,6 +1498,44 @@ public class PlaybackService extends MediaBrowserServiceCompat {
                 Log.e(TAG, "Radio Mode: Error preparing next track for crossfade", e);
             }
         });
+    }
+
+    /**
+     * Called when crossfade completes - updates playback state and marks previous episode as played.
+     */
+    private void onCrossfadeComplete(FeedMedia currentMedia, FeedItem nextItem) {
+        Log.d(TAG, "Radio Mode: Crossfade complete, updating playback state");
+        new Handler(Looper.getMainLooper()).post(() ->
+                handleCrossfadeCompletion(currentMedia, nextItem));
+    }
+
+    /**
+     * Handle the crossfade completion on the main thread.
+     */
+    private void handleCrossfadeCompletion(FeedMedia currentMedia, FeedItem nextItem) {
+        if (nextItem == null || nextItem.getMedia() == null) {
+            return;
+        }
+        this.autoSkippedFeedMediaId = currentMedia.getItem().getIdentifyingValue();
+
+        // Update media references and notify UI
+        FeedMedia nextMedia = nextItem.getMedia();
+        PlaybackPreferences.writeMediaPlaying(nextMedia);
+        updateNotificationAndMediaSession(nextMedia);
+
+        // Reset crossfade flags for the new episode
+        crossfadeStarted = false;
+        crossfadePrepared = false;
+        nextItemForCrossfade = null;
+
+        // Ensure full volume after crossfade
+        if (mediaPlayer != null) {
+            mediaPlayer.setVolume(1.0f, 1.0f);
+        }
+
+        // Mark previous episode as completed
+        currentMedia.onPlaybackCompleted(getApplicationContext());
+        SynchronizationQueue.getInstance().enqueueEpisodePlayed(currentMedia, true);
     }
 
     /**
