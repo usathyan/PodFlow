@@ -1,67 +1,83 @@
-# PodFlow - Modern Podcast Player
+# PodFlow
 
-> Your podcasts, flowing seamlessly
+PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modified for continuous playback with automatic episode management.
 
-PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) redesigned for a **radio-like listening experience**. Instead of managing individual episodes, PodFlow focuses on automatic playback with minimal interaction - just pick a podcast and listen.
+## What's Different from AntennaPod
 
-## Latest Updates (v1.0.0)
+### Core Modifications
 
-**Radio Mode Enhancements:**
-- ✅ **Radio Mode enabled by default** - Seamless listening experience out of the box
-- ✅ **Fixed inbox count** - Now shows total NEW episodes, not just podcast count
-- ✅ **Smart episode downloads** - Only downloads latest episode per podcast
-- ✅ **Seamless podcast transitions** - Auto-advance to next podcast with optional audio blending
-- ✅ **Audio crossfade/blend** - Configure fade time (0s, 30s, 1m, 5m, 10m) for smooth transitions between podcasts
-- ✅ **Skip behavior fixed** - Skip marks episode as listened, advances to next podcast (no delete)
-- ✅ **Smart deletion** - Episodes only deleted when next episode of same podcast arrives
-- ✅ **HTTP 416 handling** - Download system properly handles already-downloaded files
+**Radio Mode**
+- Automatic playback: Episodes advance to the next podcast when finished
+- Automatic deletion: Played episodes are removed when the next episode from that podcast is downloaded
+- Volume normalization: Audio levels are equalized across different podcasts using Android's DynamicsProcessing API
+- Audio transitions: Configurable fade out/in when switching episodes (0s, 30s, 1m, 5m, 10m)
+- Skip outro integration: Crossfade timing respects per-podcast skip ending settings
+- Default behavior: Enabled on fresh installs
 
----
+**Home Screen**
+- Grid-based podcast view instead of episode list
+- Direct playback: Tap podcast tile to play latest downloaded episode
+- Sorting: Podcasts ordered by latest episode date
+- Layout options: 2/3/auto column grid or list view
+- Implemented using Jetpack Compose
 
-## How PodFlow Differs from AntennaPod
+**Download Behavior**
+- Latest episode only: Auto-download retrieves only the most recent unplayed episode per podcast
+- Multi-episode support: Downloads all episodes if multiple are published on the same day
+- HTTP 416 handling: Prevents re-downloading already downloaded files
+
+**Inbox Display**
+- Episode count: Shows total new episodes across all podcasts (not podcast count)
+
+### Comparison Table
 
 | Feature | AntennaPod | PodFlow |
 |---------|------------|---------|
-| **Home Screen** | Episode-centric feed | Tiled podcast grid with one-tap play |
-| **Auto-Download** | Downloads all new episodes | Downloads only the latest episode per podcast |
-| **Radio Mode** | Not available | Auto-deletes played episodes, auto-advances to next |
-| **Volume Normalization** | Manual boost only | Real-time audio normalization across podcasts |
-| **Episode Management** | Manual queue management | Automatic - episodes disappear after playing |
-| **Philosophy** | Full podcast management | Hands-off radio experience |
+| Home screen | Episode list | Podcast grid |
+| Episode selection | Manual | Automatic (latest) |
+| Playback flow | Manual queue management | Automatic advancement |
+| Download strategy | All new episodes | Latest episode per podcast |
+| Episode lifecycle | Manual deletion | Auto-delete after playback |
+| Volume handling | Per-episode manual boost | Automatic normalization |
+| Default mode | Standard playback | Radio Mode |
 
-### Key PodFlow Features
+### Feature Details
 
-- **Radio Mode** (Enabled by Default) - Episodes auto-delete after playback and volume is normalized across all podcasts for seamless listening. Configure audio blend/crossfade when transitioning between podcasts.
-- **Audio Blending/Crossfade** - When advancing to the next podcast, optionally fade out the current episode and fade in the next over your choice of duration:
-  - **No Blend** - Instant transition
-  - **30 seconds** - Quick fade
-  - **1 minute** - Standard crossfade
-  - **5 minutes** - Extended blend
-  - **10 minutes** - Slow, smooth transition
-- **Smart Latest-Only Downloads** - Only downloads the most recent episode from each podcast. If a podcast drops multiple episodes on the same day, all are downloaded. Never re-downloads already-downloaded files.
-- **Tiled Home Screen** - Visual grid of your podcasts. Tap to play instantly. Configurable 2/3/Auto columns with list view option.
-- **Real-Time Volume Normalization** - Uses Android's DynamicsProcessing API to compress and limit audio, ensuring consistent volume across different podcasts.
-- **Smart Inbox** - Shows total count of all new episodes across all podcasts. Swipe to mark as listened and auto-advance to next podcast.
+**Radio Mode Playback Logic**
+- Checks for additional same-day episodes from current podcast first
+- Advances to next podcast with downloaded episodes if none found
+- Respects skip intro/outro settings per podcast
+- Crossfade starts before episode end time (accounting for skip outro)
 
-### App Navigation
+**Audio Crossfade Behavior**
+- Fade-out: Current episode volume gradually decreases over configured duration
+- Fade-in: Next episode starts at zero volume and increases over same duration
+- Timing: Crossfade starts at (episode_end - skip_outro - crossfade_duration)
+- Implementation: Volume adjustments posted to main thread every 50ms
 
-| Screen | What it shows |
-|--------|---------------|
-| **Home** | Grid of podcast tiles with play buttons. Tap to play the latest downloaded episode. |
-| **Queue** | Episodes queued for sequential playback. Drag to reorder. |
-| **Inbox** | New episodes (one per podcast). Swipe to dismiss or add to queue. |
-| **Downloads** | All downloaded episodes for offline listening. |
+**Download Algorithm**
+- Queries for latest episode per subscribed podcast
+- Downloads if episode is unplayed and not already downloaded
+- Handles same-day multi-episode scenarios
+- Prevents duplicate downloads via HTTP range requests
 
-### Inherited from AntennaPod
+**Volume Normalization**
+- LoudnessEnhancer: Adjusts perceived loudness to target level
+- DynamicsProcessing: Compresses dynamic range and limits peaks
+- Auto-enabled: Activates when Radio Mode is enabled
+- Per-podcast override: Can be disabled in podcast settings
 
-PodFlow inherits all the great features from AntennaPod:
-- Variable playback speed (0.5x - 3x) with per-podcast settings
-- Silence trimming (Smart Speed)
-- Sleep timer with shake-to-reset and fade-out
-- Chapter support and transcript viewing
+### Inherited Features
+
+All standard AntennaPod features remain available:
+- Variable playback speed (0.5x-3x)
+- Silence trimming
+- Sleep timer with shake-to-reset
+- Chapter support
 - OPML import/export
 - Streaming and offline playback
 - Chromecast support
+- Per-podcast skip intro/outro settings
 
 ---
 
