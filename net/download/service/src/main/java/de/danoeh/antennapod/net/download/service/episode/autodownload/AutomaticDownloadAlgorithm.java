@@ -8,8 +8,10 @@ import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.model.feed.SortOrder;
@@ -51,7 +53,10 @@ public class AutomaticDownloadAlgorithm {
 
                 Log.d(TAG, "Performing auto-dl of undownloaded episodes");
 
-                final List<FeedItem> newItems = DBReader.getEpisodes(0, Integer.MAX_VALUE,
+                // Use a reasonable limit to avoid CursorWindow overflow
+                // 500 is enough to cover typical use cases while avoiding memory issues
+                final int maxEpisodesToQuery = 500;
+                final List<FeedItem> newItems = DBReader.getEpisodes(0, maxEpisodesToQuery,
                         new FeedItemFilter(FeedItemFilter.NEW), SortOrder.DATE_NEW_OLD);
                 final List<FeedItem> candidates = new ArrayList<>();
                 for (FeedItem newItem : newItems) {
@@ -81,6 +86,15 @@ public class AutomaticDownloadAlgorithm {
                             || !item.hasMedia()
                             || item.getFeed().isLocalFeed()) {
                         it.remove();
+                    } else {
+                        // Also filter out episodes that are already downloading or queued
+                        String downloadUrl = item.getMedia().getDownloadUrl();
+                        if (downloadUrl != null && (
+                                DownloadServiceInterface.get().isDownloadingEpisode(downloadUrl)
+                                || DownloadServiceInterface.get().isEpisodeQueued(downloadUrl))) {
+                            Log.d(TAG, "Skipping already queued/downloading episode: " + item.getTitle());
+                            it.remove();
+                        }
                     }
                 }
 
@@ -105,13 +119,18 @@ public class AutomaticDownloadAlgorithm {
                     episodeSpaceLeft = episodeCacheSize - (downloadedEpisodes - deletedEpisodes);
                 }
 
+                // ALWAYS filter to only include the latest episode(s) per podcast
+                // This ensures we only download the most recent episode from each feed
+                // If multiple episodes are released on the same day, all of them are included
+                List<FeedItem> latestPerFeed = filterLatestDateEpisodes(candidates);
+
                 List<FeedItem> itemsToDownload;
-                if (cacheIsLatest && !candidates.isEmpty()) {
-                    // Filter to only include episodes from the latest publication date
-                    itemsToDownload = filterLatestDateEpisodes(candidates);
-                    Log.d(TAG, "Latest mode: filtered to " + itemsToDownload.size() + " episodes from latest date");
+                if (cacheIsUnlimited || cacheIsLatest) {
+                    // Download all latest episodes (one per podcast, or all from same day)
+                    itemsToDownload = latestPerFeed;
                 } else {
-                    itemsToDownload = candidates.subList(0, Math.min(episodeSpaceLeft, candidates.size()));
+                    // Respect the cache size limit
+                    itemsToDownload = latestPerFeed.subList(0, Math.min(episodeSpaceLeft, latestPerFeed.size()));
                 }
                 if (!itemsToDownload.isEmpty()) {
                     Log.d(TAG, "Enqueueing " + itemsToDownload.size() + " items for download");
@@ -125,37 +144,61 @@ public class AutomaticDownloadAlgorithm {
     }
 
     /**
-     * Filters candidates to only include episodes from the most recent publication date.
-     * This handles cases where a podcast releases multiple episodes on the same day.
+     * Filters candidates to only include the latest episode(s) from EACH podcast.
+     * For each podcast, only the most recent episode is included.
+     * If a podcast has multiple episodes released on the same day, all of them are included.
      *
-     * @param candidates List of candidate episodes, assumed to be sorted by date (newest first)
-     * @return List of episodes that share the most recent publication date
+     * @param candidates List of candidate episodes from multiple podcasts
+     * @return List of episodes - only the latest per podcast (or all from latest day if multi-drop)
      */
     private static List<FeedItem> filterLatestDateEpisodes(List<FeedItem> candidates) {
         if (candidates.isEmpty()) {
             return new ArrayList<>();
         }
 
-        List<FeedItem> latestEpisodes = new ArrayList<>();
-        Date latestDate = null;
-
+        // Group episodes by feed ID
+        Map<Long, List<FeedItem>> episodesByFeed = new HashMap<>();
         for (FeedItem item : candidates) {
-            Date pubDate = item.getPubDate();
-            if (pubDate == null) {
+            long feedId = item.getFeed().getId();
+            if (!episodesByFeed.containsKey(feedId)) {
+                episodesByFeed.put(feedId, new ArrayList<>());
+            }
+            episodesByFeed.get(feedId).add(item);
+        }
+
+        List<FeedItem> latestEpisodes = new ArrayList<>();
+
+        // For each feed, find only the latest episode(s)
+        for (List<FeedItem> feedEpisodes : episodesByFeed.values()) {
+            if (feedEpisodes.isEmpty()) {
                 continue;
             }
 
-            if (latestDate == null) {
-                // First item with a date becomes our reference
-                latestDate = pubDate;
-                latestEpisodes.add(item);
-            } else if (isSameDay(pubDate, latestDate)) {
-                // Same day as latest, include it
-                latestEpisodes.add(item);
+            // Find the latest date for this feed
+            Date latestDate = null;
+            for (FeedItem item : feedEpisodes) {
+                Date pubDate = item.getPubDate();
+                if (pubDate != null && (latestDate == null || pubDate.after(latestDate))) {
+                    latestDate = pubDate;
+                }
             }
-            // Episodes are sorted newest first, so once we find a different (older) date, we're done
+
+            if (latestDate == null) {
+                // No valid dates, just take the first one
+                latestEpisodes.add(feedEpisodes.get(0));
+                continue;
+            }
+
+            // Include all episodes from the latest day for this feed
+            for (FeedItem item : feedEpisodes) {
+                if (isSameDay(item.getPubDate(), latestDate)) {
+                    latestEpisodes.add(item);
+                }
+            }
         }
 
+        Log.d(TAG, "filterLatestDateEpisodes: " + candidates.size() + " candidates -> "
+                + latestEpisodes.size() + " latest episodes from " + episodesByFeed.size() + " feeds");
         return latestEpisodes;
     }
 

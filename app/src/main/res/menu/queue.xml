@@ -25,6 +25,11 @@
         android:title="@string/sort" />
 
     <item
+        android:id="@+id/queue_downloaded_only"
+        android:title="@string/queue_downloaded_only"
+        android:checkable="true" />
+
+    <item
         android:id="@+id/clear_queue"
         android:title="@string/clear_queue_label"
         custom:showAsAction="collapseActionView"

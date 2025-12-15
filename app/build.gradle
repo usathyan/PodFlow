@@ -21,6 +21,10 @@ android {
         compose true
     }
 
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     defaultConfig {
         // PodFlow version - fresh start
         // Version code schema: major * 10000 + minor * 100 + patch

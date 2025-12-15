@@ -107,6 +107,22 @@ public class HttpDownloader extends Downloader {
                 Log.d(TAG, "Feed '" + request.getSource() + "' not modified since last update, Download canceled");
                 onCancelled();
                 return;
+            } else if (response.code() == 416) {
+                // HTTP 416 Range Not Satisfiable - file is already fully downloaded
+                // This happens when we try to resume a download that's already complete
+                Log.d(TAG, "HTTP 416: File already fully downloaded at " + request.getDestination());
+                if (fileExists && destination.length() > 0) {
+                    // The file exists and has content - treat as success
+                    onSuccess();
+                } else {
+                    // File doesn't exist or is empty, but server says range is invalid
+                    // Delete the partial file and let it retry from scratch
+                    if (!destination.delete()) {
+                        Log.w(TAG, "Failed to delete partial file: " + destination.getAbsolutePath());
+                    }
+                    onFail(DownloadError.ERROR_HTTP_DATA_ERROR, "416 Range Not Satisfiable");
+                }
+                return;
             } else if (!response.isSuccessful() || response.body() == null) {
                 callOnFailByResponseCode(response);
                 return;

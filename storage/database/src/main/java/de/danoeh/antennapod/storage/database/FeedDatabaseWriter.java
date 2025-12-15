@@ -93,9 +93,23 @@ public abstract class FeedDatabaseWriter {
             if (priorMostRecent != null) {
                 priorMostRecentDate = priorMostRecent.getPubDate();
             }
-            // If no prior items exist (e.g., OPML import), treat all episodes as new
-            // by setting priorMostRecentDate to the earliest possible date
-            final boolean isNewSubscription = (priorMostRecent == null);
+            // Note: isNewSubscription is no longer used to mark all episodes as new.
+            // We now only mark the latest episode(s) even for new subscriptions.
+            // The DBWriter.setFeedState() handles initial subscription marking.
+            final boolean isNewSubscription = false; // Disabled - only latest episodes should be marked
+
+            // For new subscriptions (no prior episodes), find the latest date from new items
+            // so we only mark episodes from that date as NEW, not ALL episodes
+            Date latestNewItemDate = null;
+            if (priorMostRecentDate == null && !newFeed.getItems().isEmpty()) {
+                for (FeedItem item : newFeed.getItems()) {
+                    Date pubDate = item.getPubDate();
+                    if (pubDate != null && (latestNewItemDate == null || pubDate.after(latestNewItemDate))) {
+                        latestNewItemDate = pubDate;
+                    }
+                }
+                Log.d(TAG, "New subscription - latest item date: " + latestNewItemDate);
+            }
 
             // Look for new or updated Items
             for (int idx = 0; idx < newFeed.getItems().size(); idx++) {
@@ -156,13 +170,22 @@ public abstract class FeedDatabaseWriter {
                     }
                     savedFeedDuplicateGuesser.add(item);
 
-                    // For new subscriptions (OPML import, etc.), treat all episodes as new
-                    // For existing feeds, only treat episodes newer than the most recent as new
-                    boolean shouldPerformNewEpisodesAction = isNewSubscription
-                            || item.getPubDate() == null
-                            || priorMostRecentDate == null
-                            || priorMostRecentDate.before(item.getPubDate())
-                            || priorMostRecentDate.equals(item.getPubDate());
+                    // For new subscriptions, ONLY mark episodes from the LATEST date as new
+                    // For existing feeds, mark episodes as new if they are strictly newer
+                    // than the most recent episode we had before this refresh.
+                    boolean shouldPerformNewEpisodesAction;
+                    if (priorMostRecentDate == null) {
+                        // New subscription - only mark episodes from the latest date
+                        // Use latestNewItemDate which we computed earlier
+                        shouldPerformNewEpisodesAction = latestNewItemDate != null
+                                && item.getPubDate() != null
+                                && isSameDay(item.getPubDate(), latestNewItemDate);
+                    } else {
+                        // Existing feed - mark if newer than prior most recent
+                        shouldPerformNewEpisodesAction = isNewSubscription
+                                || item.getPubDate() == null
+                                || priorMostRecentDate.before(item.getPubDate());
+                    }
                     if (savedFeed.getState() == Feed.STATE_SUBSCRIBED && shouldPerformNewEpisodesAction) {
                         FeedPreferences.NewEpisodesAction action = savedFeed.getPreferences().getNewEpisodesAction();
                         if (action == FeedPreferences.NewEpisodesAction.GLOBAL) {
@@ -227,6 +250,12 @@ public abstract class FeedDatabaseWriter {
         // We need to add to queue after items are saved to database
         DBWriter.addQueueItem(context, itemsToAddToQueue.toArray(new FeedItem[0]));
 
+        // Radio Mode: Delete old PLAYED episodes when new episodes arrive for the same feed
+        // This implements "delete when next episode drops" behavior
+        if (savedFeed != null && UserPreferences.isRadioMode()) {
+            deleteOldPlayedEpisodesForFeed(context, savedFeed);
+        }
+
         adapter.close();
 
         if (savedFeed != null) {
@@ -242,5 +271,60 @@ public abstract class FeedDatabaseWriter {
         return "Title: " + item.getTitle()
                 + "\nID: " + item.getItemIdentifier()
                 + ((item.getMedia() == null) ? "" : "\nURL: " + item.getMedia().getDownloadUrl());
+    }
+
+    /**
+     * Radio Mode: Delete old PLAYED episodes for a feed when new episodes arrive.
+     * This implements the "delete when next episode drops" behavior.
+     * Only deletes episodes that:
+     * - Are marked as PLAYED
+     * - Have downloaded media files
+     * - Are not tagged as favorites (unless favorite keep is disabled)
+     *
+     * @param context The context
+     * @param feed The feed to clean up old episodes for
+     */
+    private static void deleteOldPlayedEpisodesForFeed(Context context, Feed feed) {
+        if (feed == null || feed.getItems() == null) {
+            return;
+        }
+
+        Log.d(TAG, "Radio Mode: Checking for old played episodes to delete in feed: " + feed.getTitle());
+
+        List<FeedItem> playedEpisodes = new ArrayList<>();
+        for (FeedItem item : feed.getItems()) {
+            // Only consider PLAYED episodes with downloaded media
+            if (item.isPlayed() && item.getMedia() != null && item.getMedia().isDownloaded()) {
+                // Skip favorites if user wants to keep them
+                if (item.isTagged(FeedItem.TAG_FAVORITE) && UserPreferences.shouldFavoriteKeepEpisode()) {
+                    Log.d(TAG, "Radio Mode: Keeping favorite episode: " + item.getTitle());
+                    continue;
+                }
+                playedEpisodes.add(item);
+            }
+        }
+
+        if (!playedEpisodes.isEmpty()) {
+            Log.d(TAG, "Radio Mode: Deleting " + playedEpisodes.size() + " old played episodes");
+            for (FeedItem item : playedEpisodes) {
+                Log.d(TAG, "Radio Mode: Deleting episode: " + item.getTitle());
+                DBWriter.deleteFeedMediaOfItem(context, item.getMedia());
+            }
+        }
+    }
+
+    /**
+     * Checks if two dates fall on the same calendar day in the local timezone.
+     */
+    private static boolean isSameDay(Date date1, Date date2) {
+        if (date1 == null || date2 == null) {
+            return false;
+        }
+        java.util.Calendar cal1 = java.util.Calendar.getInstance();
+        java.util.Calendar cal2 = java.util.Calendar.getInstance();
+        cal1.setTime(date1);
+        cal2.setTime(date2);
+        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
+                && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
     }
 }

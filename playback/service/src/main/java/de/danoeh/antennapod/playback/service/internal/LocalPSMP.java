@@ -794,4 +794,40 @@ public class LocalPSMP extends PlaybackServiceMediaPlayer {
     public boolean isCasting() {
         return false;
     }
+
+    // ==================== TRUE CROSSFADE SUPPORT ====================
+    // These methods delegate to ExoPlayerWrapper for dual-player crossfade
+
+    @Override
+    public void prepareNextForCrossfade(String url, String user, String password) {
+        if (mediaPlayer != null) {
+            mediaPlayer.prepareNextForCrossfade(url, user, password);
+        }
+    }
+
+    @Override
+    public boolean isCrossfadeReady() {
+        return mediaPlayer != null && mediaPlayer.isCrossfadeReady();
+    }
+
+    @Override
+    public void startCrossfade(long durationMs, Runnable onComplete) {
+        if (mediaPlayer != null) {
+            mediaPlayer.startCrossfade(durationMs, onComplete);
+        } else if (onComplete != null) {
+            onComplete.run();
+        }
+    }
+
+    @Override
+    public void cancelCrossfade() {
+        if (mediaPlayer != null) {
+            mediaPlayer.cancelCrossfade();
+        }
+    }
+
+    @Override
+    public boolean isCrossfadeInProgress() {
+        return mediaPlayer != null && mediaPlayer.isCrossfadeInProgress();
+    }
 }

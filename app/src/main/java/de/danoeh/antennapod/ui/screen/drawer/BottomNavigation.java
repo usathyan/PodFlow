@@ -15,7 +15,6 @@ import com.google.android.material.navigation.NavigationBarView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.event.UnreadItemsUpdateEvent;
-import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import io.reactivex.rxjava3.core.Observable;
@@ -71,7 +70,7 @@ public class BottomNavigation {
             bottomNavigationBadgeLoader.dispose();
         }
         bottomNavigationBadgeLoader = Observable.fromCallable(
-                        () -> DBReader.getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.NEW)))
+                        () -> DBReader.getLatestNewEpisodeCount())
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(result -> {

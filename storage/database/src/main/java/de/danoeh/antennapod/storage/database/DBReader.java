@@ -285,6 +285,50 @@ public final class DBReader {
         }
     }
 
+    /**
+     * Gets the count of NEW episodes, but only counting the latest episode per podcast.
+     * This respects the "latest only" download philosophy where we only want to show
+     * one new episode per podcast in the inbox.
+     *
+     * <p>Uses efficient SQL query to count distinct feeds with NEW episodes.
+     *
+     * @return Count of new episodes (latest per podcast only)
+     */
+    public static int getLatestNewEpisodeCount() {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getDistinctFeedsWithNewEpisodesCountCursor()) {
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+            return 0;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    /**
+     * Gets NEW episodes filtered to only include episodes from the latest date per podcast.
+     * If a podcast has multiple new episodes from the same day, all are returned.
+     *
+     * <p>Uses efficient SQL query with subquery to find latest date per feed.
+     *
+     * @param offset Offset for pagination
+     * @param limit Maximum number of episodes to return
+     * @param sortOrder Sort order for results (currently ignored, sorted by date DESC)
+     * @return List of new episodes (latest date per podcast)
+     */
+    public static List<FeedItem> getLatestNewEpisodesWithSameDay(int offset, int limit, SortOrder sortOrder) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (FeedItemCursor cursor = new FeedItemCursor(
+                adapter.getLatestNewEpisodesPerFeedCursor(offset, limit))) {
+            return extractItemlistFromCursor(cursor);
+        } finally {
+            adapter.close();
+        }
+    }
+
     public static int getFeedEpisodeCount(long feedId, FeedItemFilter filter) {
         PodDBAdapter adapter = PodDBAdapter.getInstance();
         adapter.open();
@@ -441,6 +485,121 @@ public final class DBReader {
         } finally {
             adapter.close();
         }
+    }
+
+    /**
+     * Radio Mode: Get the next item to play based on Radio Mode logic:
+     * 1. If there's another same-day episode from the same podcast, play it
+     * 2. Otherwise, get the next podcast from home tiles (downloaded, unplayed)
+     *
+     * @param currentItem The currently playing FeedItem
+     * @return The next FeedItem to play, or null if none available
+     */
+    @Nullable
+    public static FeedItem getNextForRadioMode(FeedItem currentItem) {
+        if (currentItem == null || currentItem.getFeed() == null) {
+            return null;
+        }
+
+        long currentFeedId = currentItem.getFeedId();
+        java.util.Date currentPubDate = currentItem.getPubDate();
+
+        // Step 1: Check for another same-day episode from the same podcast
+        if (currentPubDate != null) {
+            FeedItem sameDayEpisode = getNextSameDayEpisode(currentFeedId, currentItem.getId(), currentPubDate);
+            if (sameDayEpisode != null) {
+                Log.d(TAG, "Radio Mode: Found same-day episode from same podcast: " + sameDayEpisode.getTitle());
+                return sameDayEpisode;
+            }
+        }
+
+        // Step 2: Get the next podcast from home tiles (downloaded, unplayed episodes)
+        FeedItem nextPodcastEpisode = getNextPodcastEpisode(currentFeedId);
+        if (nextPodcastEpisode != null) {
+            Log.d(TAG, "Radio Mode: Advancing to next podcast: " + nextPodcastEpisode.getFeed().getTitle());
+        }
+        return nextPodcastEpisode;
+    }
+
+    /**
+     * Get the next same-day episode from the same feed that is unplayed and downloaded.
+     */
+    @Nullable
+    private static FeedItem getNextSameDayEpisode(long feedId, long currentItemId, java.util.Date pubDate) {
+        // Get all downloaded, unplayed episodes from this feed
+        List<FeedItem> episodes = getFeedItemList(getFeed(feedId, false, 0, Integer.MAX_VALUE),
+                new FeedItemFilter(FeedItemFilter.DOWNLOADED, FeedItemFilter.UNPLAYED),
+                SortOrder.DATE_NEW_OLD, 0, Integer.MAX_VALUE);
+
+        // Find episodes from the same day
+        java.util.Calendar targetCal = java.util.Calendar.getInstance();
+        targetCal.setTime(pubDate);
+
+        for (FeedItem episode : episodes) {
+            if (episode.getId() == currentItemId) {
+                continue; // Skip current episode
+            }
+            if (episode.getPubDate() == null) {
+                continue;
+            }
+
+            java.util.Calendar episodeCal = java.util.Calendar.getInstance();
+            episodeCal.setTime(episode.getPubDate());
+
+            // Check if same day
+            if (targetCal.get(java.util.Calendar.YEAR) == episodeCal.get(java.util.Calendar.YEAR)
+                    && targetCal.get(java.util.Calendar.DAY_OF_YEAR)
+                        == episodeCal.get(java.util.Calendar.DAY_OF_YEAR)) {
+                loadAdditionalFeedItemListData(Collections.singletonList(episode));
+                return episode;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get the next podcast's latest downloaded episode from home tiles.
+     * This finds a different podcast's latest unplayed, downloaded episode.
+     */
+    @Nullable
+    private static FeedItem getNextPodcastEpisode(long currentFeedId) {
+        // Get all feeds
+        List<Feed> feeds = getFeedList();
+
+        // Sort by some order (e.g., title or last played)
+        Collections.sort(feeds, (a, b) -> {
+            String titleA = a.getTitle() != null ? a.getTitle() : "";
+            String titleB = b.getTitle() != null ? b.getTitle() : "";
+            return titleA.compareToIgnoreCase(titleB);
+        });
+
+        // Find the current feed's position and get the next one
+        int currentIndex = -1;
+        for (int i = 0; i < feeds.size(); i++) {
+            if (feeds.get(i).getId() == currentFeedId) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        // Start from next feed and wrap around
+        for (int offset = 1; offset <= feeds.size(); offset++) {
+            int nextIndex = (currentIndex + offset) % feeds.size();
+            Feed nextFeed = feeds.get(nextIndex);
+
+            // Get downloaded, unplayed episodes from this feed
+            List<FeedItem> episodes = getFeedItemList(nextFeed,
+                    new FeedItemFilter(FeedItemFilter.DOWNLOADED, FeedItemFilter.UNPLAYED),
+                    SortOrder.DATE_NEW_OLD, 0, 1);
+
+            if (!episodes.isEmpty()) {
+                FeedItem episode = episodes.get(0);
+                loadAdditionalFeedItemListData(episodes);
+                return episode;
+            }
+        }
+
+        return null;
     }
 
     @NonNull
@@ -756,7 +915,7 @@ public final class DBReader {
 
         Collections.sort(feeds, comparator);
         final int queueSize = adapter.getQueueSize();
-        final int numNewItems = getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.NEW));
+        final int numNewItems = getLatestNewEpisodeCount();
         final int numDownloadedItems = getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.DOWNLOADED));
 
         NavDrawerData.TagItem untaggedTag = new NavDrawerData.TagItem(FeedPreferences.TAG_UNTAGGED);

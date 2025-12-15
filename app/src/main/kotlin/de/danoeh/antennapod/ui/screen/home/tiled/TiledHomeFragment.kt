@@ -7,11 +7,12 @@ import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
+import de.danoeh.antennapod.ui.screen.home.carousel.CarouselHomeScreen
 import de.danoeh.antennapod.ui.theme.PodFlowTheme
 
 /**
- * Fragment wrapper for the Compose-based Tiled Home screen.
- * Integrates with the existing Fragment-based navigation system.
+ * Fragment wrapper for the Compose-based Home screen.
+ * Displays the horizontal carousel of podcasts for commute radio experience.
  */
 class TiledHomeFragment : Fragment() {
 
@@ -24,7 +25,7 @@ class TiledHomeFragment : Fragment() {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 PodFlowTheme {
-                    TiledHomeScreen(
+                    CarouselHomeScreen(
                         onPodcastClick = { podcast ->
                             // Navigate to podcast details when tile is clicked (not play button)
                             // This can be extended to load the feed details fragment

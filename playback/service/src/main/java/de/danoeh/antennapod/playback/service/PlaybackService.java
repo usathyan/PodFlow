@@ -79,6 +79,10 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
@@ -799,6 +803,22 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         }
 
         mediaPlayer.playMediaObject(playable, stream, true, true);
+
+        // Reset crossfade flags for new episode
+        crossfadeStarted = false;
+        crossfadePrepared = false;
+        nextItemForCrossfade = null;
+
+        // Apply Radio Mode fade-in if transitioning between episodes
+        if (UserPreferences.isRadioMode()) {
+            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
+            if (blendTimeMs > 0) {
+                Log.d(TAG, "Radio Mode: Applying fade-in effect (" + blendTimeMs + "ms) for new episode");
+                mediaPlayer.setVolume(0.0f, 0.0f);  // Start at zero volume
+                fadeInVolume(blendTimeMs);  // Fade in over blend time
+            }
+        }
+
         stateManager.validStartCommandWasReceived();
         stateManager.startForeground(R.id.notification_playing, notificationBuilder.build());
         recreateMediaSessionIfNeeded();
@@ -1062,7 +1082,22 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         }
     }
 
+    private static final ExecutorService dbExecutor = Executors.newSingleThreadExecutor();
+
     private Playable getNextInQueue(final Playable currentMedia) {
+        // Run database operations on a background thread to avoid StrictMode violations
+        // The method needs to return synchronously, so we use a Future with blocking get()
+        Future<Playable> future = dbExecutor.submit(() -> getNextInQueueInternal(currentMedia));
+        try {
+            return future.get(5, TimeUnit.SECONDS);
+        } catch (ExecutionException | InterruptedException | java.util.concurrent.TimeoutException e) {
+            Log.e(TAG, "Error getting next in queue", e);
+            PlaybackPreferences.writeNoMediaPlaying();
+            return null;
+        }
+    }
+
+    private Playable getNextInQueueInternal(final Playable currentMedia) {
         if (!(currentMedia instanceof FeedMedia)) {
             Log.d(TAG, "getNextInQueue(), but playable not an instance of FeedMedia, so not proceeding");
             PlaybackPreferences.writeNoMediaPlaying();
@@ -1079,32 +1114,61 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             PlaybackPreferences.writeNoMediaPlaying();
             return null;
         }
+
         FeedItem nextItem;
-        nextItem = DBReader.getNextInQueue(item);
+
+        // Radio Mode: Use special logic to get next item
+        // 1. Same-day episode from same podcast, or
+        // 2. Next podcast from home tiles
+        if (UserPreferences.isRadioMode()) {
+            Log.d(TAG, "Radio Mode: Getting next item using Radio Mode logic");
+            try {
+                nextItem = DBReader.getNextForRadioMode(item);
+            } catch (Exception e) {
+                Log.e(TAG, "Error in Radio Mode getNextForRadioMode, falling back to standard queue", e);
+                nextItem = DBReader.getNextInQueue(item);
+            }
+        } else {
+            // Standard queue-based navigation
+            nextItem = DBReader.getNextInQueue(item);
+        }
 
         if (nextItem == null || nextItem.getMedia() == null) {
+            Log.d(TAG, "No next item found");
             PlaybackPreferences.writeNoMediaPlaying();
             return null;
         }
 
-        // continue playback if user has enabled continuous playback
-        // OR they enabled an episode sleep timer and there are still episodes left to play
-        final boolean continuousPlayback = UserPreferences.isFollowQueue() && shouldContinueToNextEpisode();
+        // Radio Mode always continues (seamless radio experience)
+        // Non-Radio Mode requires Follow Queue and continuous playback settings
+        final boolean continuousPlayback;
+        if (UserPreferences.isRadioMode()) {
+            continuousPlayback = shouldContinueToNextEpisode();  // Only check sleep timer
+            Log.d(TAG, "Radio Mode: Continuous playback = " + continuousPlayback);
+        } else {
+            continuousPlayback = UserPreferences.isFollowQueue() && shouldContinueToNextEpisode();
+        }
 
         if (!continuousPlayback) {
-            Log.d(TAG, "getNextInQueue(), but follow queue is not enabled.");
+            Log.d(TAG, "getNextInQueue(), but continuous playback not enabled.");
             PlaybackPreferences.writeMediaPlaying(nextItem.getMedia());
-            updateNotificationAndMediaSession(nextItem.getMedia());
+            // Note: updateNotificationAndMediaSession must be called on main thread
+            final FeedItem finalNextItem = nextItem;
+            new Handler(Looper.getMainLooper()).post(() ->
+                    updateNotificationAndMediaSession(finalNextItem.getMedia()));
             return null;
         }
 
         if (!nextItem.getMedia().localFileAvailable() && !NetworkUtils.isStreamingAllowed()
-                && UserPreferences.isFollowQueue() && !nextItem.getFeed().isLocalFeed()) {
-            displayStreamingNotAllowedNotification(
-                    new PlaybackServiceStarter(this, nextItem.getMedia())
-                            .getIntent());
+                && !nextItem.getFeed().isLocalFeed()) {
+            final FeedItem finalNextItem = nextItem;
+            new Handler(Looper.getMainLooper()).post(() -> {
+                displayStreamingNotAllowedNotification(
+                        new PlaybackServiceStarter(this, finalNextItem.getMedia())
+                                .getIntent());
+                stateManager.stopService();
+            });
             PlaybackPreferences.writeNoMediaPlaying();
-            stateManager.stopService();
             return null;
         }
         return nextItem.getMedia();
@@ -1203,6 +1267,9 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             autoSkipped = true;
         }
 
+        // Note: Radio Mode crossfade is now handled proactively in skipEndingIfNecessary()
+        // to properly respect skip outro settings and start fade before episode ends
+
         if (ended || almostEnded) {
             SynchronizationQueue.getInstance().enqueueEpisodePlayed(media, true);
             media.onPlaybackCompleted(getApplicationContext());
@@ -1220,17 +1287,26 @@ public class PlaybackService extends MediaBrowserServiceCompat {
                 DBWriter.markItemPlayed(item, FeedItem.PLAYED, ended || (skipped && almostEnded));
                 // don't know if it actually matters to not autodownload when smart mark as played is triggered
                 DBWriter.removeQueueItem(PlaybackService.this, ended, item);
-                // Delete episode if enabled
-                FeedPreferences.AutoDeleteAction action =
-                        item.getFeed().getPreferences().getCurrentAutoDelete();
-                boolean autoDeleteEnabledGlobally = UserPreferences.isAutoDelete()
-                        && (!item.getFeed().isLocalFeed() || UserPreferences.isAutoDeleteLocal());
-                boolean shouldAutoDelete = action == FeedPreferences.AutoDeleteAction.ALWAYS
-                        || (action == FeedPreferences.AutoDeleteAction.GLOBAL && autoDeleteEnabledGlobally);
-                if (shouldAutoDelete && (!item.isTagged(FeedItem.TAG_FAVORITE)
-                        || !UserPreferences.shouldFavoriteKeepEpisode())) {
-                    DBWriter.deleteFeedMediaOfItem(PlaybackService.this, media);
-                    Log.d(TAG, "Episode Deleted");
+
+                // Delete episode logic:
+                // - In Radio Mode: DON'T delete here - deletion happens when next episode drops
+                // - Otherwise: Use existing auto-delete preferences
+                boolean radioModeEnabled = UserPreferences.isRadioMode();
+                if (!radioModeEnabled) {
+                    // Only auto-delete if NOT in Radio Mode (Radio Mode defers deletion)
+                    FeedPreferences.AutoDeleteAction action =
+                            item.getFeed().getPreferences().getCurrentAutoDelete();
+                    boolean autoDeleteEnabledGlobally = UserPreferences.isAutoDelete()
+                            && (!item.getFeed().isLocalFeed() || UserPreferences.isAutoDeleteLocal());
+                    boolean shouldAutoDelete = action == FeedPreferences.AutoDeleteAction.ALWAYS
+                            || (action == FeedPreferences.AutoDeleteAction.GLOBAL && autoDeleteEnabledGlobally);
+                    if (shouldAutoDelete && (!item.isTagged(FeedItem.TAG_FAVORITE)
+                            || !UserPreferences.shouldFavoriteKeepEpisode())) {
+                        DBWriter.deleteFeedMediaOfItem(PlaybackService.this, media);
+                        Log.d(TAG, "Episode Deleted (Auto-delete enabled)");
+                    }
+                } else {
+                    Log.d(TAG, "Radio Mode: Episode kept until next episode drops");
                 }
                 notifyChildrenChanged(getString(R.string.queue_label));
             }
@@ -1273,6 +1349,10 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         sendBroadcast(intent);
     }
 
+    private boolean crossfadeStarted = false;  // Track if crossfade already started for current episode
+    private boolean crossfadePrepared = false;  // Track if next track is prepared for crossfade
+    private FeedItem nextItemForCrossfade = null;  // Next item prepared for crossfade
+
     private void skipEndingIfNecessary() {
         Playable playable = mediaPlayer.getPlayable();
         if (! (playable instanceof FeedMedia)) {
@@ -1280,11 +1360,62 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         }
 
         int duration = getDuration();
-        int remainingTime = duration - getCurrentPosition();
+        int currentPosition = getCurrentPosition();
+        int remainingTime = duration - currentPosition;
 
         FeedMedia feedMedia = (FeedMedia) playable;
         FeedPreferences preferences = feedMedia.getItem().getFeed().getPreferences();
         int skipEnd = preferences.getFeedSkipEnding();
+
+        // Calculate effective end time (considering skip outro)
+        int effectiveEndTime = duration - (skipEnd * 1000);
+
+        // Check if Radio Mode crossfade should start
+        if (UserPreferences.isRadioMode() && !crossfadeStarted) {
+            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
+            if (blendTimeMs > 0) {
+                // Calculate when crossfade should start (before effective end time)
+                int crossfadeStartTime = effectiveEndTime - blendTimeMs;
+                // Calculate when to prepare next track (10 seconds before crossfade, or immediately if less time)
+                int prepareTime = Math.max(0, crossfadeStartTime - 10000);
+
+                // Prepare next track ahead of time (10 seconds before crossfade starts)
+                if (!crossfadePrepared && currentPosition >= prepareTime && currentPosition < crossfadeStartTime) {
+                    prepareNextTrackForCrossfade(feedMedia);
+                }
+
+                // Check if we've reached crossfade start time (with 1 second window)
+                if (currentPosition >= crossfadeStartTime && currentPosition < crossfadeStartTime + 1000) {
+                    Log.d(TAG, "Radio Mode: Starting TRUE crossfade at position " + currentPosition +
+                             " (effective end: " + effectiveEndTime + ", blend time: " + blendTimeMs + "ms)");
+                    crossfadeStarted = true;
+
+                    // Start true crossfade if next track is prepared
+                    if (mediaPlayer.isCrossfadeReady() && nextItemForCrossfade != null) {
+                        Log.d(TAG, "Radio Mode: Crossfade player ready, starting overlapping crossfade");
+                        final FeedMedia currentMedia = feedMedia;
+                        final FeedItem nextItem = nextItemForCrossfade;
+                        mediaPlayer.startCrossfade(blendTimeMs,
+                                () -> onCrossfadeComplete(currentMedia, nextItem));
+                        return;
+                    }
+                    // Fallback to old fade-out behavior if crossfade not ready
+                    Log.d(TAG, "Radio Mode: Crossfade not ready, falling back to fade-out/skip");
+                    fadeOutVolume(blendTimeMs);
+
+                    // Schedule the skip to happen after fade completes
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        if (mediaPlayer != null && mediaPlayer.getPlayable() == playable) {
+                            this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
+                            mediaPlayer.skip();
+                        }
+                    }, blendTimeMs);
+                    return;
+                }
+            }
+        }
+
+        // Standard skip ending logic (if no Radio Mode crossfade)
         if (skipEnd > 0
                 && skipEnd * 1000 < getDuration()
                 && (remainingTime - (skipEnd * 1000) > 0)
@@ -1298,6 +1429,113 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
             mediaPlayer.skip();
         }
+    }
+
+    /**
+     * Prepare the next track for true crossfade.
+     * This loads the next episode into a secondary player so it's ready when crossfade begins.
+     */
+    private void prepareNextTrackForCrossfade(FeedMedia currentMedia) {
+        if (crossfadePrepared) {
+            return;
+        }
+
+        Log.d(TAG, "Radio Mode: Preparing next track for crossfade");
+        crossfadePrepared = true;
+
+        // Get next item in Radio Mode (runs on background thread)
+        dbExecutor.execute(() -> {
+            try {
+                FeedItem currentItem = currentMedia.getItem();
+                if (currentItem == null) {
+                    currentItem = DBReader.getFeedItem(currentMedia.getItemId());
+                }
+                if (currentItem == null) {
+                    Log.w(TAG, "Radio Mode: Could not get current item for crossfade preparation");
+                    return;
+                }
+
+                FeedItem nextItem = DBReader.getNextForRadioMode(currentItem);
+                if (nextItem == null || nextItem.getMedia() == null) {
+                    Log.d(TAG, "Radio Mode: No next item found for crossfade");
+                    return;
+                }
+
+                nextItemForCrossfade = nextItem;
+                FeedMedia nextMedia = nextItem.getMedia();
+
+                // Get media URL (use final variables for lambda)
+                final String mediaUrl;
+                final String mediaUser;
+                final String mediaPassword;
+
+                if (nextMedia.localFileAvailable()) {
+                    mediaUrl = nextMedia.getLocalFileUrl();
+                    mediaUser = null;
+                    mediaPassword = null;
+                } else {
+                    mediaUrl = nextMedia.getStreamUrl();
+                    FeedPreferences prefs = nextItem.getFeed().getPreferences();
+                    if (prefs != null) {
+                        mediaUser = prefs.getUsername();
+                        mediaPassword = prefs.getPassword();
+                    } else {
+                        mediaUser = null;
+                        mediaPassword = null;
+                    }
+                }
+
+                Log.d(TAG, "Radio Mode: Preparing crossfade for: " + nextItem.getTitle() + " (" + mediaUrl + ")");
+
+                // Prepare on main thread (MediaPlayer operations)
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (mediaPlayer != null) {
+                        mediaPlayer.prepareNextForCrossfade(mediaUrl, mediaUser, mediaPassword);
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Radio Mode: Error preparing next track for crossfade", e);
+            }
+        });
+    }
+
+    /**
+     * Called when crossfade completes - updates playback state and marks previous episode as played.
+     */
+    private void onCrossfadeComplete(FeedMedia currentMedia, FeedItem nextItem) {
+        Log.d(TAG, "Radio Mode: Crossfade complete, updating playback state");
+        new Handler(Looper.getMainLooper()).post(() ->
+                handleCrossfadeCompletion(currentMedia, nextItem));
+    }
+
+    /**
+     * Handle the crossfade completion on the main thread.
+     */
+    private void handleCrossfadeCompletion(FeedMedia currentMedia, FeedItem nextItem) {
+        if (nextItem == null || nextItem.getMedia() == null) {
+            return;
+        }
+        this.autoSkippedFeedMediaId = currentMedia.getItem().getIdentifyingValue();
+
+        // Update media references and notify UI
+        FeedMedia nextMedia = nextItem.getMedia();
+        PlaybackPreferences.writeMediaPlaying(nextMedia);
+        updateNotificationAndMediaSession(nextMedia);
+
+        // Reset crossfade flags for the new episode
+        crossfadeStarted = false;
+        crossfadePrepared = false;
+        nextItemForCrossfade = null;
+
+        // Ensure full volume after crossfade
+        if (mediaPlayer != null) {
+            mediaPlayer.setVolume(1.0f, 1.0f);
+        }
+
+        // Mark previous episode as completed
+        currentMedia.onPlaybackCompleted(getApplicationContext());
+        SynchronizationQueue.getInstance().enqueueEpisodePlayed(currentMedia, true);
     }
 
     /**
@@ -2076,4 +2314,117 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             }
         }
     };
+
+    /**
+     * Fade out the current episode during Radio Mode blend transition.
+     * This reduces volume gradually from current level to 0 over the specified duration.
+     * Used to create a smoother transition when advancing to the next episode in Radio Mode.
+     */
+    private void fadeOutVolume(long durationMs) {
+        if (mediaPlayer == null || durationMs <= 0) {
+            return;
+        }
+
+        Log.d(TAG, "Fading out volume over " + durationMs + "ms");
+
+        // Capture the current mediaPlayer to avoid issues if it gets replaced during fade
+        final PlaybackServiceMediaPlayer currentPlayer = mediaPlayer;
+
+        // Run fade out on a background thread, but post volume changes to main thread
+        new Thread(() -> {
+            try {
+                long startTime = System.currentTimeMillis();
+                float initialVolume = 1.0f;
+
+                while (System.currentTimeMillis() - startTime < durationMs) {
+                    if (currentPlayer == null) {
+                        break;
+                    }
+
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    float progress = (float) elapsed / durationMs;
+                    float newVolume = initialVolume * (1.0f - progress);
+                    final float volumeToSet = newVolume; // Make a final copy for lambda closure
+
+                    // Post volume change to main thread
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (currentPlayer != null) {
+                            currentPlayer.setVolume(volumeToSet, volumeToSet);
+                        }
+                    });
+                    Thread.sleep(50); // Update every 50ms for smooth fade
+                }
+
+                // Post final volume to main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (currentPlayer != null) {
+                        currentPlayer.setVolume(0.0f, 0.0f);
+                    }
+                });
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+    }
+
+    /**
+     * Fade in the current episode during Radio Mode blend transition.
+     * This increases volume gradually from 0 to full volume over the specified duration.
+     * Used to create a smoother transition when advancing to the next episode in Radio Mode.
+     */
+    private void fadeInVolume(long durationMs) {
+        if (mediaPlayer == null || durationMs <= 0) {
+            if (mediaPlayer != null) {
+                mediaPlayer.setVolume(1.0f, 1.0f);
+            }
+            return;
+        }
+
+        Log.d(TAG, "Fading in volume over " + durationMs + "ms");
+
+        // Capture the current mediaPlayer to avoid issues if it gets replaced during fade
+        final PlaybackServiceMediaPlayer currentPlayer = mediaPlayer;
+
+        // Post initial mute to main thread
+        new Handler(Looper.getMainLooper()).post(() -> {
+            if (currentPlayer != null) {
+                currentPlayer.setVolume(0.0f, 0.0f);
+            }
+        });
+
+        // Run fade in on a background thread, but post volume changes to main thread
+        new Thread(() -> {
+            try {
+                long startTime = System.currentTimeMillis();
+
+                while (System.currentTimeMillis() - startTime < durationMs) {
+                    if (currentPlayer == null) {
+                        break;
+                    }
+
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    float progress = (float) elapsed / durationMs;
+                    float newVolume = progress;
+                    final float volumeToSet = newVolume; // Make a final copy for lambda closure
+
+                    // Post volume change to main thread
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (currentPlayer != null) {
+                            currentPlayer.setVolume(volumeToSet, volumeToSet);
+                        }
+                    });
+                    Thread.sleep(50); // Update every 50ms for smooth fade
+                }
+
+                // Post final volume to main thread
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (currentPlayer != null) {
+                        currentPlayer.setVolume(1.0f, 1.0f);
+                    }
+                });
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+    }
 }

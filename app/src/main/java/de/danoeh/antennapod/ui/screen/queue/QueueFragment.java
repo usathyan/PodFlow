@@ -39,6 +39,7 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -272,6 +273,7 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         boolean keepSorted = UserPreferences.isQueueKeepSorted();
         toolbar.getMenu().findItem(R.id.queue_lock).setChecked(UserPreferences.isQueueLocked());
         toolbar.getMenu().findItem(R.id.queue_lock).setVisible(!keepSorted);
+        toolbar.getMenu().findItem(R.id.queue_downloaded_only).setChecked(UserPreferences.isQueueDownloadedOnly());
     }
 
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
@@ -313,6 +315,12 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
             return true;
         } else if (itemId == R.id.action_search) {
             ((MainActivity) getActivity()).loadChildFragment(SearchFragment.newInstance());
+            return true;
+        } else if (itemId == R.id.queue_downloaded_only) {
+            boolean newValue = !UserPreferences.isQueueDownloadedOnly();
+            UserPreferences.setQueueDownloadedOnly(newValue);
+            refreshToolbarState();
+            loadItems();
             return true;
         }
         return false;
@@ -529,9 +537,20 @@ public class QueueFragment extends Fragment implements MaterialToolbar.OnMenuIte
         if (queue == null) {
             emptyView.hide();
         }
+        final boolean downloadedOnly = UserPreferences.isQueueDownloadedOnly();
         disposable = Observable.fromCallable(() -> {
-            boolean displayGoToInboxButton = DBReader.getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.NEW)) > 0;
-            return new Pair<>(DBReader.getQueue(), displayGoToInboxButton);
+            boolean displayGoToInboxButton = DBReader.getLatestNewEpisodeCount() > 0;
+            List<FeedItem> queueItems = DBReader.getQueue();
+            if (downloadedOnly) {
+                List<FeedItem> filteredQueue = new ArrayList<>();
+                for (FeedItem item : queueItems) {
+                    if (item.isDownloaded()) {
+                        filteredQueue.add(item);
+                    }
+                }
+                return new Pair<>(filteredQueue, displayGoToInboxButton);
+            }
+            return new Pair<>(queueItems, displayGoToInboxButton);
         })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())

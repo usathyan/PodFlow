@@ -96,20 +96,22 @@ public class InboxFragment extends EpisodesListFragment {
     @NonNull
     @Override
     protected List<FeedItem> loadData() {
-        return DBReader.getEpisodes(0, page * EPISODES_PER_PAGE,
-                new FeedItemFilter(FeedItemFilter.NEW),  UserPreferences.getInboxSortedOrder());
+        // Only show latest new episodes per podcast (respects "latest only" philosophy)
+        return DBReader.getLatestNewEpisodesWithSameDay(0, page * EPISODES_PER_PAGE,
+                UserPreferences.getInboxSortedOrder());
     }
 
     @NonNull
     @Override
     protected List<FeedItem> loadMoreData(int page) {
-        return DBReader.getEpisodes((page - 1) * EPISODES_PER_PAGE, EPISODES_PER_PAGE,
-                new FeedItemFilter(FeedItemFilter.NEW), UserPreferences.getInboxSortedOrder());
+        return DBReader.getLatestNewEpisodesWithSameDay((page - 1) * EPISODES_PER_PAGE, EPISODES_PER_PAGE,
+                UserPreferences.getInboxSortedOrder());
     }
 
     @Override
     protected int loadTotalItemCount() {
-        return DBReader.getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.NEW));
+        // Count only latest new episodes per podcast
+        return DBReader.getLatestNewEpisodeCount();
     }
 
     private void removeAllFromInbox() {

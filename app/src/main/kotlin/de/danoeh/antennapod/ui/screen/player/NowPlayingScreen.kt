@@ -1,5 +1,6 @@
 package de.danoeh.antennapod.ui.screen.player
 
+import java.util.Locale
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -80,6 +82,8 @@ fun NowPlayingScreen(
     onPlayPause: () -> Unit = {},
     onSkipBack: () -> Unit = {},
     onSkipForward: () -> Unit = {},
+    onSkipPreviousPodcast: () -> Unit = {},
+    onSkipNextPodcast: () -> Unit = {},
     onSeek: (Long) -> Unit = {}
 ) {
     val playbackState by viewModel.playbackState.collectAsState()
@@ -178,7 +182,9 @@ fun NowPlayingScreen(
                 onSkipForward = {
                     viewModel.skipForward()
                     onSkipForward()
-                }
+                },
+                onSkipPreviousPodcast = onSkipPreviousPodcast,
+                onSkipNextPodcast = onSkipNextPodcast
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -321,13 +327,31 @@ private fun PlaybackControlsSection(
     isPlaying: Boolean,
     onPlayPause: () -> Unit,
     onSkipBack: () -> Unit,
-    onSkipForward: () -> Unit
+    onSkipForward: () -> Unit,
+    onSkipPreviousPodcast: () -> Unit,
+    onSkipNextPodcast: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Skip to previous podcast button
+        ControlButton(
+            onClick = onSkipPreviousPodcast,
+            icon = { modifier ->
+                Icon(
+                    Icons.Default.SkipPrevious,
+                    contentDescription = "Previous podcast",
+                    modifier = modifier,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            size = 40.dp
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
         // Skip backward button
         ControlButton(
             onClick = onSkipBack,
@@ -342,7 +366,7 @@ private fun PlaybackControlsSection(
             size = 48.dp
         )
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
 
         // Play/Pause button
         PlayPauseButton(
@@ -350,7 +374,7 @@ private fun PlaybackControlsSection(
             onClick = onPlayPause
         )
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
 
         // Skip forward button
         ControlButton(
@@ -364,6 +388,22 @@ private fun PlaybackControlsSection(
                 )
             },
             size = 48.dp
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Skip to next podcast button
+        ControlButton(
+            onClick = onSkipNextPodcast,
+            icon = { modifier ->
+                Icon(
+                    Icons.Default.SkipNext,
+                    contentDescription = "Next podcast",
+                    modifier = modifier,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            size = 40.dp
         )
     }
 }
@@ -522,8 +562,8 @@ private fun formatTime(millis: Long): String {
     val hours = millis / (1000 * 60 * 60)
 
     return if (hours > 0) {
-        String.format("%d:%02d:%02d", hours, minutes, seconds)
+        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
     } else {
-        String.format("%d:%02d", minutes, seconds)
+        String.format(Locale.US, "%d:%02d", minutes, seconds)
     }
 }
