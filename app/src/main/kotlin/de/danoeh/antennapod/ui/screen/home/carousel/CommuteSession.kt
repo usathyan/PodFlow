@@ -1,21 +1,21 @@
 package de.danoeh.antennapod.ui.screen.home.carousel
 
 import android.content.Context
-import android.content.SharedPreferences
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Represents a commute listening session for a single day.
  * Tracks which podcasts have been completed and current playback position.
  */
 data class CommuteSession(
-    val date: LocalDate,
-    val podcastOrder: List<Long>,           // Feed IDs in carousel order
-    val completedPodcasts: Set<Long>,       // Feed IDs that finished
-    val currentPodcastId: Long?,            // Currently playing feed ID
-    val currentEpisodeId: Long?,            // Currently playing episode ID
-    val currentPositionMs: Long             // Playback position in milliseconds
+    val date: String,                         // Date string in yyyy-MM-dd format
+    val podcastOrder: List<Long>,             // Feed IDs in carousel order
+    val completedPodcasts: Set<Long>,         // Feed IDs that finished
+    val currentPodcastId: Long?,              // Currently playing feed ID
+    val currentEpisodeId: Long?,              // Currently playing episode ID
+    val currentPositionMs: Long               // Playback position in milliseconds
 ) {
     companion object {
         private const val PREFS_NAME = "commute_session"
@@ -26,7 +26,9 @@ data class CommuteSession(
         private const val KEY_CURRENT_EPISODE = "current_episode_id"
         private const val KEY_POSITION = "current_position_ms"
 
-        private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+        private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
+        private fun getTodayString(): String = dateFormat.format(Date())
 
         /**
          * Load session from SharedPreferences.
@@ -36,14 +38,9 @@ data class CommuteSession(
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
             val dateStr = prefs.getString(KEY_DATE, null) ?: return null
-            val sessionDate = try {
-                LocalDate.parse(dateStr, dateFormatter)
-            } catch (e: Exception) {
-                return null
-            }
 
             // Check if session is from today
-            if (sessionDate != LocalDate.now()) {
+            if (dateStr != getTodayString()) {
                 return null
             }
 
@@ -66,7 +63,7 @@ data class CommuteSession(
             val positionMs = prefs.getLong(KEY_POSITION, 0L)
 
             return CommuteSession(
-                date = sessionDate,
+                date = dateStr,
                 podcastOrder = podcastOrder,
                 completedPodcasts = completed,
                 currentPodcastId = currentPodcastId,
@@ -80,7 +77,7 @@ data class CommuteSession(
          */
         fun createNew(podcastOrder: List<Long>): CommuteSession {
             return CommuteSession(
-                date = LocalDate.now(),
+                date = getTodayString(),
                 podcastOrder = podcastOrder,
                 completedPodcasts = emptySet(),
                 currentPodcastId = null,
@@ -106,7 +103,7 @@ data class CommuteSession(
     fun save(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()
-            .putString(KEY_DATE, date.format(dateFormatter))
+            .putString(KEY_DATE, date)
             .putString(KEY_PODCAST_ORDER, podcastOrder.joinToString(","))
             .putString(KEY_COMPLETED, completedPodcasts.joinToString(","))
             .putLong(KEY_CURRENT_PODCAST, currentPodcastId ?: -1L)
