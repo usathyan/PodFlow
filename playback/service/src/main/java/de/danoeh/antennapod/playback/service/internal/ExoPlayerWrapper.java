@@ -681,7 +681,6 @@ public class ExoPlayerWrapper {
         // Calculate fade steps (update every 50ms for smooth transitions)
         final long intervalMs = 50;
         final int totalSteps = (int) (durationMs / intervalMs);
-        final float volumeStep = startVolumeMain / totalSteps;
 
         // Dispose of any existing crossfade disposable
         if (crossfadeDisposable != null && !crossfadeDisposable.isDisposed()) {
