@@ -270,6 +270,58 @@ public abstract class PlaybackServiceMediaPlayer {
 
     public abstract boolean isCasting();
 
+    // ==================== TRUE CROSSFADE SUPPORT ====================
+    // Default no-op implementations. Override in subclasses that support crossfade.
+
+    /**
+     * Prepare the next track for crossfade.
+     * This loads the next track into a secondary player so it's ready when crossfade begins.
+     *
+     * @param url      Media URL to load
+     * @param user     HTTP auth user (optional)
+     * @param password HTTP auth password (optional)
+     */
+    public void prepareNextForCrossfade(String url, String user, String password) {
+        // Default: no-op (not supported)
+    }
+
+    /**
+     * Check if next track is ready for crossfade.
+     *
+     * @return true if crossfade player is ready to play
+     */
+    public boolean isCrossfadeReady() {
+        return false; // Default: not supported
+    }
+
+    /**
+     * Start the crossfade transition.
+     * Both tracks play simultaneously while volumes cross-fade.
+     *
+     * @param durationMs Crossfade duration in milliseconds
+     * @param onComplete Callback when crossfade completes (player swap done)
+     */
+    public void startCrossfade(long durationMs, Runnable onComplete) {
+        // Default: just run completion callback (not supported)
+        if (onComplete != null) {
+            onComplete.run();
+        }
+    }
+
+    /**
+     * Cancel an in-progress crossfade.
+     */
+    public void cancelCrossfade() {
+        // Default: no-op (not supported)
+    }
+
+    /**
+     * Check if crossfade is currently in progress.
+     */
+    public boolean isCrossfadeInProgress() {
+        return false; // Default: not in progress
+    }
+
     protected final synchronized void acquireWifiLockIfNecessary() {
         if (shouldLockWifi()) {
             if (wifiLock == null) {

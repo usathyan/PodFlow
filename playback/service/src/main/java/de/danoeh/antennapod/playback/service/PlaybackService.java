@@ -804,8 +804,10 @@ public class PlaybackService extends MediaBrowserServiceCompat {
 
         mediaPlayer.playMediaObject(playable, stream, true, true);
 
-        // Reset crossfade flag for new episode
+        // Reset crossfade flags for new episode
         crossfadeStarted = false;
+        crossfadePrepared = false;
+        nextItemForCrossfade = null;
 
         // Apply Radio Mode fade-in if transitioning between episodes
         if (UserPreferences.isRadioMode()) {
@@ -1348,6 +1350,8 @@ public class PlaybackService extends MediaBrowserServiceCompat {
     }
 
     private boolean crossfadeStarted = false;  // Track if crossfade already started for current episode
+    private boolean crossfadePrepared = false;  // Track if next track is prepared for crossfade
+    private FeedItem nextItemForCrossfade = null;  // Next item prepared for crossfade
 
     private void skipEndingIfNecessary() {
         Playable playable = mediaPlayer.getPlayable();
@@ -1372,22 +1376,70 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             if (blendTimeMs > 0) {
                 // Calculate when crossfade should start (before effective end time)
                 int crossfadeStartTime = effectiveEndTime - blendTimeMs;
+                // Calculate when to prepare next track (10 seconds before crossfade, or immediately if less time)
+                int prepareTime = Math.max(0, crossfadeStartTime - 10000);
+
+                // Prepare next track ahead of time (10 seconds before crossfade starts)
+                if (!crossfadePrepared && currentPosition >= prepareTime && currentPosition < crossfadeStartTime) {
+                    prepareNextTrackForCrossfade(feedMedia);
+                }
 
                 // Check if we've reached crossfade start time (with 1 second window)
                 if (currentPosition >= crossfadeStartTime && currentPosition < crossfadeStartTime + 1000) {
-                    Log.d(TAG, "Radio Mode: Starting crossfade at position " + currentPosition +
+                    Log.d(TAG, "Radio Mode: Starting TRUE crossfade at position " + currentPosition +
                              " (effective end: " + effectiveEndTime + ", blend time: " + blendTimeMs + "ms)");
                     crossfadeStarted = true;
-                    fadeOutVolume(blendTimeMs);
 
-                    // Schedule the skip to happen after fade completes
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        if (mediaPlayer != null && mediaPlayer.getPlayable() == playable) {
-                            this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
-                            mediaPlayer.skip();
-                        }
-                    }, blendTimeMs);
-                    return;
+                    // Start true crossfade if next track is prepared
+                    if (mediaPlayer.isCrossfadeReady() && nextItemForCrossfade != null) {
+                        Log.d(TAG, "Radio Mode: Crossfade player ready, starting overlapping crossfade");
+                        final FeedMedia currentMedia = feedMedia;
+                        final FeedItem nextItem = nextItemForCrossfade;
+
+                        mediaPlayer.startCrossfade(blendTimeMs, () -> {
+                            // Crossfade complete - update playback state
+                            Log.d(TAG, "Radio Mode: Crossfade complete, updating playback state");
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                if (nextItem != null && nextItem.getMedia() != null) {
+                                    this.autoSkippedFeedMediaId = currentMedia.getItem().getIdentifyingValue();
+
+                                    // Update media references and notify UI
+                                    FeedMedia nextMedia = nextItem.getMedia();
+                                    PlaybackPreferences.writeMediaPlaying(nextMedia);
+                                    updateNotificationAndMediaSession(nextMedia);
+
+                                    // Reset crossfade flags for the new episode
+                                    crossfadeStarted = false;
+                                    crossfadePrepared = false;
+                                    nextItemForCrossfade = null;
+
+                                    // Apply Radio Mode fade-in for any residual adjustment
+                                    // (crossfade already handled the volume, but ensure full volume)
+                                    if (mediaPlayer != null) {
+                                        mediaPlayer.setVolume(1.0f, 1.0f);
+                                    }
+
+                                    // Mark previous episode as completed
+                                    currentMedia.onPlaybackCompleted(getApplicationContext());
+                                    SynchronizationQueue.getInstance().enqueueEpisodePlayed(currentMedia, true);
+                                }
+                            });
+                        });
+                        return;
+                    } else {
+                        // Fallback to old fade-out behavior if crossfade not ready
+                        Log.d(TAG, "Radio Mode: Crossfade not ready, falling back to fade-out/skip");
+                        fadeOutVolume(blendTimeMs);
+
+                        // Schedule the skip to happen after fade completes
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            if (mediaPlayer != null && mediaPlayer.getPlayable() == playable) {
+                                this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
+                                mediaPlayer.skip();
+                            }
+                        }, blendTimeMs);
+                        return;
+                    }
                 }
             }
         }
@@ -1406,6 +1458,75 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
             mediaPlayer.skip();
         }
+    }
+
+    /**
+     * Prepare the next track for true crossfade.
+     * This loads the next episode into a secondary player so it's ready when crossfade begins.
+     */
+    private void prepareNextTrackForCrossfade(FeedMedia currentMedia) {
+        if (crossfadePrepared) {
+            return;
+        }
+
+        Log.d(TAG, "Radio Mode: Preparing next track for crossfade");
+        crossfadePrepared = true;
+
+        // Get next item in Radio Mode (runs on background thread)
+        dbExecutor.execute(() -> {
+            try {
+                FeedItem currentItem = currentMedia.getItem();
+                if (currentItem == null) {
+                    currentItem = DBReader.getFeedItem(currentMedia.getItemId());
+                }
+                if (currentItem == null) {
+                    Log.w(TAG, "Radio Mode: Could not get current item for crossfade preparation");
+                    return;
+                }
+
+                FeedItem nextItem = DBReader.getNextForRadioMode(currentItem);
+                if (nextItem == null || nextItem.getMedia() == null) {
+                    Log.d(TAG, "Radio Mode: No next item found for crossfade");
+                    return;
+                }
+
+                nextItemForCrossfade = nextItem;
+                FeedMedia nextMedia = nextItem.getMedia();
+
+                // Get media URL (use final variables for lambda)
+                final String mediaUrl;
+                final String mediaUser;
+                final String mediaPassword;
+
+                if (nextMedia.localFileAvailable()) {
+                    mediaUrl = nextMedia.getLocalFileUrl();
+                    mediaUser = null;
+                    mediaPassword = null;
+                } else {
+                    mediaUrl = nextMedia.getStreamUrl();
+                    FeedPreferences prefs = nextItem.getFeed().getPreferences();
+                    if (prefs != null) {
+                        mediaUser = prefs.getUsername();
+                        mediaPassword = prefs.getPassword();
+                    } else {
+                        mediaUser = null;
+                        mediaPassword = null;
+                    }
+                }
+
+                Log.d(TAG, "Radio Mode: Preparing crossfade for: " + nextItem.getTitle() + " (" + mediaUrl + ")");
+
+                // Prepare on main thread (MediaPlayer operations)
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (mediaPlayer != null) {
+                        mediaPlayer.prepareNextForCrossfade(mediaUrl, mediaUser, mediaPassword);
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Radio Mode: Error preparing next track for crossfade", e);
+            }
+        });
     }
 
     /**
