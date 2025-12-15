@@ -804,6 +804,20 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         }
 
         mediaPlayer.playMediaObject(playable, stream, true, true);
+
+        // Reset crossfade flag for new episode
+        crossfadeStarted = false;
+
+        // Apply Radio Mode fade-in if transitioning between episodes
+        if (UserPreferences.isRadioMode()) {
+            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
+            if (blendTimeMs > 0) {
+                Log.d(TAG, "Radio Mode: Applying fade-in effect (" + blendTimeMs + "ms) for new episode");
+                mediaPlayer.setVolume(0.0f, 0.0f);  // Start at zero volume
+                fadeInVolume(blendTimeMs);  // Fade in over blend time
+            }
+        }
+
         stateManager.validStartCommandWasReceived();
         stateManager.startForeground(R.id.notification_playing, notificationBuilder.build());
         recreateMediaSessionIfNeeded();
@@ -1252,14 +1266,8 @@ public class PlaybackService extends MediaBrowserServiceCompat {
             autoSkipped = true;
         }
 
-        // Handle Radio Mode blend/crossfade when episode ends
-        if ((ended || almostEnded) && UserPreferences.isRadioMode()) {
-            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
-            if (blendTimeMs > 0) {
-                Log.d(TAG, "Radio Mode: Applying blend effect (" + blendTimeMs + "ms) at end of episode");
-                fadeOutVolume(blendTimeMs);
-            }
-        }
+        // Note: Radio Mode crossfade is now handled proactively in skipEndingIfNecessary()
+        // to properly respect skip outro settings and start fade before episode ends
 
         if (ended || almostEnded) {
             SynchronizationQueue.getInstance().enqueueEpisodePlayed(media, true);
@@ -1340,6 +1348,8 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         sendBroadcast(intent);
     }
 
+    private boolean crossfadeStarted = false;  // Track if crossfade already started for current episode
+
     private void skipEndingIfNecessary() {
         Playable playable = mediaPlayer.getPlayable();
         if (! (playable instanceof FeedMedia)) {
@@ -1347,11 +1357,43 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         }
 
         int duration = getDuration();
-        int remainingTime = duration - getCurrentPosition();
+        int currentPosition = getCurrentPosition();
+        int remainingTime = duration - currentPosition;
 
         FeedMedia feedMedia = (FeedMedia) playable;
         FeedPreferences preferences = feedMedia.getItem().getFeed().getPreferences();
         int skipEnd = preferences.getFeedSkipEnding();
+
+        // Calculate effective end time (considering skip outro)
+        int effectiveEndTime = duration - (skipEnd * 1000);
+
+        // Check if Radio Mode crossfade should start
+        if (UserPreferences.isRadioMode() && !crossfadeStarted) {
+            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
+            if (blendTimeMs > 0) {
+                // Calculate when crossfade should start (before effective end time)
+                int crossfadeStartTime = effectiveEndTime - blendTimeMs;
+
+                // Check if we've reached crossfade start time (with 1 second window)
+                if (currentPosition >= crossfadeStartTime && currentPosition < crossfadeStartTime + 1000) {
+                    Log.d(TAG, "Radio Mode: Starting crossfade at position " + currentPosition +
+                             " (effective end: " + effectiveEndTime + ", blend time: " + blendTimeMs + "ms)");
+                    crossfadeStarted = true;
+                    fadeOutVolume(blendTimeMs);
+
+                    // Schedule the skip to happen after fade completes
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        if (mediaPlayer != null && mediaPlayer.getPlayable() == playable) {
+                            this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
+                            mediaPlayer.skip();
+                        }
+                    }, blendTimeMs);
+                    return;
+                }
+            }
+        }
+
+        // Standard skip ending logic (if no Radio Mode crossfade)
         if (skipEnd > 0
                 && skipEnd * 1000 < getDuration()
                 && (remainingTime - (skipEnd * 1000) > 0)

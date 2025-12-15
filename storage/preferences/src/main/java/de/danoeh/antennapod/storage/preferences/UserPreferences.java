@@ -973,15 +973,21 @@ public abstract class UserPreferences {
     /**
      * Gets the Radio Mode blend/crossfade time in milliseconds.
      * Options: 0 (no blend), 30000 (30s), 60000 (1m), 300000 (5m), 600000 (10m)
-     * Default: 0 (no blend)
+     * Default: 30000 (30s) - provides smooth transitions by default
      */
     public static int getRadioModeBlendTimeMs() {
-        int blendTimeMs = prefs.getInt(PREF_RADIO_MODE_BLEND_TIME, 0);  // Default 0 (no blend)
-        return Math.max(0, blendTimeMs);
+        // MaterialListPreference stores values as strings, not integers
+        String blendTimeStr = prefs.getString(PREF_RADIO_MODE_BLEND_TIME, "30000");
+        try {
+            return Math.max(0, Integer.parseInt(blendTimeStr));
+        } catch (NumberFormatException e) {
+            Log.e(TAG, "Invalid blend time value: " + blendTimeStr + ", using default 30s", e);
+            return 30000;  // Fallback: 30s
+        }
     }
 
     public static void setRadioModeBlendTimeMs(int blendTimeMs) {
-        prefs.edit().putInt(PREF_RADIO_MODE_BLEND_TIME, blendTimeMs).apply();
+        prefs.edit().putString(PREF_RADIO_MODE_BLEND_TIME, String.valueOf(blendTimeMs)).apply();
     }
 
     /**
