@@ -306,18 +306,22 @@ This section documents all modifications made to the AntennaPod codebase to crea
 
 ## Technology Stack
 
-| Component | Technology |
-|-----------|------------|
-| Language | Kotlin 2.0+ |
-| UI Framework | Jetpack Compose |
-| Design System | Material 3 |
-| Architecture | MVVM + Clean Architecture |
-| Async | Kotlin Coroutines + Flow |
-| DI | Hilt (planned) |
-| Database | Room |
-| Networking | Retrofit + OkHttp |
-| Image Loading | Coil |
-| Media | Media3 (ExoPlayer) |
+PodFlow builds on AntennaPod's mature codebase while adding modern Android components for new features.
+
+| Component | AntennaPod (Inherited) | PodFlow (Added) |
+|-----------|------------------------|-----------------|
+| Language | Java | + **Kotlin** |
+| UI Framework | XML Views + Fragments | + **Jetpack Compose** (carousel home) |
+| Design System | Material 2 | + **Material 3** (new screens) |
+| Architecture | MVP-style | + **MVVM** (Compose screens) |
+| Async | RxJava3 | + **Kotlin Coroutines** |
+| DI | Manual/Service Locator | Hilt (planned) |
+| Database | Room | Room |
+| Networking | OkHttp | OkHttp |
+| Image Loading | Glide | + **Coil** (Compose screens) |
+| Media | ExoPlayer (single) | + **Dual ExoPlayer** (crossfade) |
+
+**Note**: PodFlow is a hybrid codebase. New features (carousel home, crossfade) use modern Kotlin/Compose, while inherited screens (subscriptions, queue, settings) retain the original Java/XML implementation. This allows rapid feature development while maintaining stability of the battle-tested AntennaPod core.
 
 ## Screenshots
 
