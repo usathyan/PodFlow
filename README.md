@@ -42,6 +42,15 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 **Inbox Display**
 - Episode count: Shows total new episodes across all podcasts (not podcast count)
 
+**Queue (Playlist Management)**
+- The queue is your playlist: Episodes play in queue order from top to bottom
+- Drag to reorder: Long-press and drag episodes to change playback sequence
+- Auto-advances: When an episode finishes, the next queued episode plays automatically
+- Add episodes: Swipe or tap "Add to Queue" on any episode to include it
+- Remove episodes: Swipe to remove from queue without deleting the download
+- Lock queue: Prevent accidental reordering with the lock toggle
+- Smart enqueue: New downloads automatically added to queue (configurable position: front, back, or after current)
+
 ### Comparison Table
 
 | Feature | AntennaPod | PodFlow |
