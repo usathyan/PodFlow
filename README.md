@@ -2,6 +2,14 @@
 
 PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modified for continuous playback with automatic episode management.
 
+<p float="left">
+<img src="docs/images/Screenshot_20251217-122515.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122538.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122600.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122615.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122635.png" width="180" />
+</p>
+
 ## What's Different from AntennaPod
 
 ### Core Modifications
@@ -299,16 +307,6 @@ PodFlow builds on AntennaPod's mature codebase while adding modern Android compo
 | Media | ExoPlayer (single) | ExoPlayer (gapless playback) |
 
 **Note**: PodFlow is a hybrid codebase. New features (carousel home) use modern Kotlin/Compose, while inherited screens (subscriptions, queue, settings) retain the original Java/XML implementation. This allows rapid feature development while maintaining stability of the battle-tested AntennaPod core.
-
-## Screenshots
-
-<p float="left">
-<img src="docs/images/Screenshot_20251217-122515.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122538.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122600.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122615.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122635.png" width="180" />
-</p>
 
 ## Building from Source
 
