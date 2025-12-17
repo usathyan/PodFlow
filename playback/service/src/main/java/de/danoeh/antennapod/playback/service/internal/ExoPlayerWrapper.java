@@ -560,6 +560,35 @@ public class ExoPlayerWrapper {
         return volumeNormalizationEnabled;
     }
 
+    /**
+     * Temporarily suspend DynamicsProcessing during volume fades to prevent choppy audio.
+     * Call resumeVolumeNormalization() when fade is complete.
+     */
+    public void suspendVolumeNormalization() {
+        if (dynamicsProcessing != null && volumeNormalizationEnabled) {
+            try {
+                dynamicsProcessing.setEnabled(false);
+                Log.d(TAG, "Suspended DynamicsProcessing for volume fade");
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to suspend DynamicsProcessing: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Resume DynamicsProcessing after volume fade is complete.
+     */
+    public void resumeVolumeNormalization() {
+        if (dynamicsProcessing != null && volumeNormalizationEnabled) {
+            try {
+                dynamicsProcessing.setEnabled(true);
+                Log.d(TAG, "Resumed DynamicsProcessing after volume fade");
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to resume DynamicsProcessing: " + e.getMessage());
+            }
+        }
+    }
+
     // ==================== TRUE CROSSFADE SUPPORT ====================
     // Dual-player approach: secondary player loads next track while primary plays
     // Both tracks play simultaneously during crossfade with overlapping volume fades
@@ -670,6 +699,17 @@ public class ExoPlayerWrapper {
         Log.d(TAG, "Starting true crossfade over " + durationMs + "ms");
         crossfadeInProgress = true;
 
+        // Disable DynamicsProcessing during crossfade to prevent choppy audio
+        // The rapid volume changes conflict with the audio effect processing
+        if (dynamicsProcessing != null) {
+            try {
+                dynamicsProcessing.setEnabled(false);
+                Log.d(TAG, "Disabled DynamicsProcessing for crossfade");
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to disable DynamicsProcessing: " + e.getMessage());
+            }
+        }
+
         // Get starting volumes
         final float startVolumeMain = exoPlayer.getVolume();
         final float startVolumeCrossfade = 0f;
@@ -749,8 +789,13 @@ public class ExoPlayerWrapper {
         crossfadeMediaSource = null;
         crossfadeInProgress = false;
 
-        // Re-initialize loudness enhancer for new player
+        // Re-initialize audio effects for new player
         initLoudnessEnhancer(exoPlayer.getAudioSessionId());
+        // Re-enable DynamicsProcessing for the new player's audio session
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && volumeNormalizationEnabled) {
+            initVolumeNormalization(exoPlayer.getAudioSessionId());
+            Log.d(TAG, "Re-enabled DynamicsProcessing after crossfade");
+        }
 
         // Set up listener for the new main player
         exoPlayer.addListener(new Player.Listener() {
@@ -812,6 +857,15 @@ public class ExoPlayerWrapper {
         // Restore main player volume
         if (exoPlayer != null) {
             exoPlayer.setVolume(1f);
+        }
+        // Re-enable DynamicsProcessing after cancelled crossfade
+        if (dynamicsProcessing != null && volumeNormalizationEnabled) {
+            try {
+                dynamicsProcessing.setEnabled(true);
+                Log.d(TAG, "Re-enabled DynamicsProcessing after crossfade cancel");
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to re-enable DynamicsProcessing: " + e.getMessage());
+            }
         }
     }
 

@@ -62,16 +62,6 @@
                 android:summary="@string/pref_hardware_previous_button_summary"/>
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="@string/radio_mode">
-        <de.danoeh.antennapod.ui.preferences.preference.MaterialListPreference
-                android:defaultValue="0"
-                android:entries="@array/radio_mode_blend_options"
-                android:entryValues="@array/radio_mode_blend_values"
-                android:key="prefRadioModeBlendTime"
-                android:title="@string/pref_radio_mode_blend_time_title"
-                android:summary="@string/pref_radio_mode_blend_time_summary"/>
-    </PreferenceCategory>
-
     <PreferenceCategory android:title="@string/queue_label">
         <de.danoeh.antennapod.ui.preferences.preference.MaterialListPreference
                 android:defaultValue="BACK"

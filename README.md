@@ -10,9 +10,7 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 - Automatic playback: Episodes advance to the next podcast when finished
 - Automatic deletion: Played episodes are removed when the next episode from that podcast is downloaded
 - Volume normalization: Audio levels are equalized across different podcasts using Android's DynamicsProcessing API
-- True crossfade: Both tracks play simultaneously during transitions using dual ExoPlayer instances
-- Configurable blend times: 0s, 30s, 1m, 5m, 10m crossfade durations
-- Skip outro integration: Crossfade timing respects per-podcast skip ending settings
+- Gapless playback: Seamless transitions between podcasts using Media3's built-in gapless support
 - Skip podcast controls: Dedicated buttons in player to jump to previous/next podcast
 - Wrap-around playback: Plays through all podcasts in sequence, loops back to start
 - Default behavior: Enabled on fresh installs
@@ -41,7 +39,7 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 | Home screen | Episode list | Horizontal podcast carousel |
 | Episode selection | Manual | Automatic (latest) |
 | Playback flow | Manual queue management | Automatic advancement with wrap-around |
-| Audio transitions | None | True overlapping crossfade (dual-player) |
+| Audio transitions | None | Gapless playback (Media3) |
 | Session tracking | None | Daily session with visual progress |
 | Download strategy | All new episodes | Latest episode per podcast |
 | Episode lifecycle | Manual deletion | Auto-delete after playback |
@@ -54,16 +52,7 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 - Checks for additional same-day episodes from current podcast first
 - Advances to next podcast with downloaded episodes if none found
 - Respects skip intro/outro settings per podcast
-- Crossfade starts before episode end time (accounting for skip outro)
-
-**Audio Crossfade Behavior (True Overlapping Crossfade)**
-- Dual-player architecture: Secondary ExoPlayer instance loads next track during playback
-- Pre-loading: Next episode prepared 10 seconds before crossfade begins
-- Simultaneous playback: Both tracks play at the same time during crossfade
-- Volume crossfade: Current episode fades out (100%→0%) while next fades in (0%→100%)
-- Timing: Crossfade starts at (episode_end - skip_outro - crossfade_duration)
-- Implementation: RxJava interval updates volumes every 50ms for smooth transitions
-- Fallback: If next track isn't ready, falls back to sequential fade-out/skip/fade-in
+- Gapless transition using Media3's built-in playlist support
 
 **Download Algorithm**
 - Queries for latest episode per subscribed podcast
@@ -101,8 +90,7 @@ This section documents all modifications made to the AntennaPod codebase to crea
 - **New playback mode** that auto-advances to the next podcast when an episode finishes
 - **Auto-deletion**: Episodes are automatically deleted after playback (smart deletion - only when next episode arrives)
 - **Volume normalization**: Real-time audio processing using Android's `LoudnessEnhancer` and `DynamicsProcessing` APIs
-- **True overlapping crossfade**: Dual ExoPlayer architecture for simultaneous playback during transitions
-- **Configurable fade times**: 0s, 30s, 1m, 5m, 10m blend durations
+- **Gapless playback**: Seamless transitions using Media3's built-in gapless support
 - **Skip behavior**: Skip button marks episode as listened and advances to next podcast (no deletion)
 - **Enabled by default**: Radio Mode is the default experience for new installs
 
@@ -110,23 +98,15 @@ This section documents all modifications made to the AntennaPod codebase to crea
 - `playback/service/src/main/java/de/danoeh/antennapod/playback/service/PlaybackService.java`
   - Added Radio Mode playback logic
   - Implemented `getNextInQueue()` override for Radio Mode
-  - True crossfade with next track pre-loading (10s ahead)
   - Volume normalization integration
 - `playback/service/src/main/java/de/danoeh/antennapod/playback/service/internal/ExoPlayerWrapper.java`
-  - Dual ExoPlayer support for true overlapping crossfade
-  - `prepareNextForCrossfade()`: Pre-loads next track into secondary player
-  - `startCrossfade()`: Both tracks play simultaneously with volume cross-fading
-  - `completeCrossfade()`: Swaps players after transition completes
   - Integrated `LoudnessEnhancer` and `DynamicsProcessing` for volume normalization
-- `playback/base/src/main/java/de/danoeh/antennapod/playback/base/PlaybackServiceMediaPlayer.java`
-  - Added crossfade method signatures for subclass implementations
 - `storage/database/src/main/java/de/danoeh/antennapod/storage/database/DBReader.java`
   - Added `getNextForRadioMode()` method (lines 499-522)
   - Added `getNextSameDayEpisode()` helper (lines 528-557)
   - Added `getNextPodcastEpisode()` helper (lines 564-602)
 - `storage/preferences/src/main/java/de/danoeh/antennapod/storage/preferences/UserPreferences.java`
   - Added Radio Mode preference flags (lines 71-74)
-  - Added blend time preference management (lines 975-985)
   - Added volume normalization preferences (lines 958-997)
 
 #### 2. **Carousel Home Screen** (`77104c903`, `280874a38`)
@@ -206,20 +186,17 @@ This section documents all modifications made to the AntennaPod codebase to crea
 - `app/src/main/kotlin/de/danoeh/antennapod/ui/theme/Theme.kt`
 
 #### Settings UI
-- Added Radio Mode settings category in Playback preferences
-- Added blend/crossfade time picker
-- Added volume normalization toggle
+- Radio Mode settings in Playback preferences
+- Volume normalization toggle
 
 **Files Modified:**
 - `ui/preferences/src/main/res/xml/preferences_playback.xml`
-  - Added Radio Mode preference switches
-  - Added blend time list preference
+  - Radio Mode preference switches
 
 ### Configuration Changes
 
 #### Default Settings (for Fresh Installs)
 - Radio Mode: **ON** (was OFF)
-- Audio crossfade: **30 seconds** (was 0/disabled)
 - Volume normalization: **ON** (was OFF)
 - Auto-download: **ON** (unchanged)
 
@@ -284,10 +261,10 @@ This section documents all modifications made to the AntennaPod codebase to crea
    - Users who want sequential playback can use Queue
    - Dynamic re-evaluation on every transition
 
-3. **Why 30s Default Crossfade?**
-   - Smooth transitions without being too long
-   - Balances seamlessness with user control
-   - Users can disable or adjust
+3. **Why Gapless Playback?**
+   - Uses Media3's built-in gapless support for reliable, seamless transitions
+   - No audio processing conflicts that cause choppy sound
+   - Simpler and more reliable than custom crossfade
 
 4. **Why Latest-Only Downloads?**
    - Reduces storage usage
@@ -319,18 +296,18 @@ PodFlow builds on AntennaPod's mature codebase while adding modern Android compo
 | Database | Room | Room |
 | Networking | OkHttp | OkHttp |
 | Image Loading | Glide | + **Coil** (Compose screens) |
-| Media | ExoPlayer (single) | + **Dual ExoPlayer** (crossfade) |
+| Media | ExoPlayer (single) | ExoPlayer (gapless playback) |
 
-**Note**: PodFlow is a hybrid codebase. New features (carousel home, crossfade) use modern Kotlin/Compose, while inherited screens (subscriptions, queue, settings) retain the original Java/XML implementation. This allows rapid feature development while maintaining stability of the battle-tested AntennaPod core.
+**Note**: PodFlow is a hybrid codebase. New features (carousel home) use modern Kotlin/Compose, while inherited screens (subscriptions, queue, settings) retain the original Java/XML implementation. This allows rapid feature development while maintaining stability of the battle-tested AntennaPod core.
 
 ## Screenshots
 
 <p float="left">
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_home.png" width="180" />
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_queue.png" width="180" />
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_subscriptions.png" width="180" />
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_player.png" width="180" />
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05_downloads.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122515.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122538.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122600.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122615.png" width="180" />
+<img src="docs/images/Screenshot_20251217-122635.png" width="180" />
 </p>
 
 ## Building from Source

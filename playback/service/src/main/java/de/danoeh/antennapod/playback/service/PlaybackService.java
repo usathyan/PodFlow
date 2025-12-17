@@ -804,20 +804,8 @@ public class PlaybackService extends MediaBrowserServiceCompat {
 
         mediaPlayer.playMediaObject(playable, stream, true, true);
 
-        // Reset crossfade flags for new episode
-        crossfadeStarted = false;
-        crossfadePrepared = false;
-        nextItemForCrossfade = null;
-
-        // Apply Radio Mode fade-in if transitioning between episodes
-        if (UserPreferences.isRadioMode()) {
-            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
-            if (blendTimeMs > 0) {
-                Log.d(TAG, "Radio Mode: Applying fade-in effect (" + blendTimeMs + "ms) for new episode");
-                mediaPlayer.setVolume(0.0f, 0.0f);  // Start at zero volume
-                fadeInVolume(blendTimeMs);  // Fade in over blend time
-            }
-        }
+        // Note: Using Media3's built-in gapless playback instead of custom crossfade
+        // This provides seamless transitions without audio processing conflicts
 
         stateManager.validStartCommandWasReceived();
         stateManager.startForeground(R.id.notification_playing, notificationBuilder.build());
@@ -1367,55 +1355,10 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         FeedPreferences preferences = feedMedia.getItem().getFeed().getPreferences();
         int skipEnd = preferences.getFeedSkipEnding();
 
-        // Calculate effective end time (considering skip outro)
-        int effectiveEndTime = duration - (skipEnd * 1000);
+        // Note: Crossfade disabled - using Media3's built-in gapless playback instead
+        // This provides seamless transitions without the audio processing conflicts
 
-        // Check if Radio Mode crossfade should start
-        if (UserPreferences.isRadioMode() && !crossfadeStarted) {
-            int blendTimeMs = UserPreferences.getRadioModeBlendTimeMs();
-            if (blendTimeMs > 0) {
-                // Calculate when crossfade should start (before effective end time)
-                int crossfadeStartTime = effectiveEndTime - blendTimeMs;
-                // Calculate when to prepare next track (10 seconds before crossfade, or immediately if less time)
-                int prepareTime = Math.max(0, crossfadeStartTime - 10000);
-
-                // Prepare next track ahead of time (10 seconds before crossfade starts)
-                if (!crossfadePrepared && currentPosition >= prepareTime && currentPosition < crossfadeStartTime) {
-                    prepareNextTrackForCrossfade(feedMedia);
-                }
-
-                // Check if we've reached crossfade start time (with 1 second window)
-                if (currentPosition >= crossfadeStartTime && currentPosition < crossfadeStartTime + 1000) {
-                    Log.d(TAG, "Radio Mode: Starting TRUE crossfade at position " + currentPosition +
-                             " (effective end: " + effectiveEndTime + ", blend time: " + blendTimeMs + "ms)");
-                    crossfadeStarted = true;
-
-                    // Start true crossfade if next track is prepared
-                    if (mediaPlayer.isCrossfadeReady() && nextItemForCrossfade != null) {
-                        Log.d(TAG, "Radio Mode: Crossfade player ready, starting overlapping crossfade");
-                        final FeedMedia currentMedia = feedMedia;
-                        final FeedItem nextItem = nextItemForCrossfade;
-                        mediaPlayer.startCrossfade(blendTimeMs,
-                                () -> onCrossfadeComplete(currentMedia, nextItem));
-                        return;
-                    }
-                    // Fallback to old fade-out behavior if crossfade not ready
-                    Log.d(TAG, "Radio Mode: Crossfade not ready, falling back to fade-out/skip");
-                    fadeOutVolume(blendTimeMs);
-
-                    // Schedule the skip to happen after fade completes
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        if (mediaPlayer != null && mediaPlayer.getPlayable() == playable) {
-                            this.autoSkippedFeedMediaId = feedMedia.getItem().getIdentifyingValue();
-                            mediaPlayer.skip();
-                        }
-                    }, blendTimeMs);
-                    return;
-                }
-            }
-        }
-
-        // Standard skip ending logic (if no Radio Mode crossfade)
+        // Standard skip ending logic
         if (skipEnd > 0
                 && skipEnd * 1000 < getDuration()
                 && (remainingTime - (skipEnd * 1000) > 0)
@@ -2385,6 +2328,11 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         // Capture the current mediaPlayer to avoid issues if it gets replaced during fade
         final PlaybackServiceMediaPlayer currentPlayer = mediaPlayer;
 
+        // Suspend volume normalization during fade to prevent choppy audio
+        if (currentPlayer instanceof LocalPSMP) {
+            ((LocalPSMP) currentPlayer).suspendVolumeNormalization();
+        }
+
         // Post initial mute to main thread
         new Handler(Looper.getMainLooper()).post(() -> {
             if (currentPlayer != null) {
@@ -2416,14 +2364,24 @@ public class PlaybackService extends MediaBrowserServiceCompat {
                     Thread.sleep(50); // Update every 50ms for smooth fade
                 }
 
-                // Post final volume to main thread
+                // Post final volume and resume volume normalization on main thread
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (currentPlayer != null) {
                         currentPlayer.setVolume(1.0f, 1.0f);
+                        // Resume volume normalization after fade completes
+                        if (currentPlayer instanceof LocalPSMP) {
+                            ((LocalPSMP) currentPlayer).resumeVolumeNormalization();
+                        }
                     }
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                // Still try to resume volume normalization on interrupt
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (currentPlayer instanceof LocalPSMP) {
+                        ((LocalPSMP) currentPlayer).resumeVolumeNormalization();
+                    }
+                });
             }
         }).start();
     }

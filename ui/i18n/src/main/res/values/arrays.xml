@@ -1,21 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <!-- Radio Mode Blend Time Options -->
-    <string-array name="radio_mode_blend_options">
-        <item>No blend (instant)</item>
-        <item>30 seconds</item>
-        <item>1 minute</item>
-        <item>5 minutes</item>
-        <item>10 minutes</item>
-    </string-array>
-
-    <string-array name="radio_mode_blend_values">
-        <item>0</item>
-        <item>30000</item>
-        <item>60000</item>
-        <item>300000</item>
-        <item>600000</item>
-    </string-array>
-
+    <!-- Removed: Radio Mode Blend Time Options (using Media3 gapless playback instead) -->
 </resources>

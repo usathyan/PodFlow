@@ -507,6 +507,24 @@ public class LocalPSMP extends PlaybackServiceMediaPlayer {
         Log.d(TAG, "Media player volume was set to " + volumeLeft + " " + volumeRight);
     }
 
+    /**
+     * Temporarily suspend volume normalization during volume fades.
+     */
+    public void suspendVolumeNormalization() {
+        if (mediaPlayer != null) {
+            mediaPlayer.suspendVolumeNormalization();
+        }
+    }
+
+    /**
+     * Resume volume normalization after volume fade is complete.
+     */
+    public void resumeVolumeNormalization() {
+        if (mediaPlayer != null) {
+            mediaPlayer.resumeVolumeNormalization();
+        }
+    }
+
     @Override
     public MediaType getCurrentMediaType() {
         return mediaType;

@@ -50,6 +50,9 @@ import de.danoeh.antennapod.playback.cast.CastEnabledActivity;
 import de.danoeh.antennapod.playback.service.PlaybackServiceInterface;
 import de.danoeh.antennapod.storage.databasemaintenanceservice.DatabaseMaintenanceWorker;
 import de.danoeh.antennapod.storage.importexport.AutomaticDatabaseExportWorker;
+import de.danoeh.antennapod.model.feed.FeedItem;
+import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
+import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.ui.TransitionEffect;
@@ -85,8 +88,11 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The activity that is shown when the user launches the app.
@@ -166,23 +172,8 @@ public class MainActivity extends CastEnabledActivity {
 
         final FragmentManager fm = getSupportFragmentManager();
         if (fm.findFragmentByTag(MAIN_FRAGMENT_TAG) == null) {
-            if (!UserPreferences.DEFAULT_PAGE_REMEMBER.equals(UserPreferences.getDefaultPage())) {
-                loadFragment(UserPreferences.getDefaultPage(), null);
-            } else {
-                String lastFragment = NavDrawerFragment.getLastNavFragment(this);
-                if (ArrayUtils.contains(getResources().getStringArray(R.array.nav_drawer_section_tags), lastFragment)) {
-                    loadFragment(lastFragment, null);
-                } else {
-                    try {
-                        loadFeedFragmentById(Integer.parseInt(lastFragment), null);
-                    } catch (NumberFormatException e) {
-                        // it's not a number, this happens if we removed
-                        // a label from the NAV_DRAWER_TAGS
-                        // give them a nice default...
-                        loadFragment(HomeFragment.TAG, null);
-                    }
-                }
-            }
+            // Always start with Home screen for PodFlow radio experience
+            loadFragment(HomeFragment.TAG, null);
         }
 
         FragmentTransaction transaction = fm.beginTransaction();
@@ -252,6 +243,66 @@ public class MainActivity extends CastEnabledActivity {
                     DownloadServiceInterface.get().setCurrentDownloads(updatedEpisodes);
                     EventBus.getDefault().postSticky(new EpisodeDownloadEvent(updatedEpisodes));
                 });
+
+        // Auto-start playback on fresh app launch (delayed to ensure views are ready)
+        if (savedInstanceState == null) {
+            findViewById(R.id.main_view).post(this::autoStartPlaybackFromQueue);
+        }
+    }
+
+    /**
+     * Auto-start playback from queue on app launch.
+     * Plays the first item in queue and opens the Now Playing screen.
+     */
+    private void autoStartPlaybackFromQueue() {
+        // Check if something is already playing
+        if (PlaybackPreferences.getCurrentlyPlayingFeedMediaId() != PlaybackPreferences.NO_MEDIA_PLAYING) {
+            Log.d(TAG, "autoStartPlayback: Already playing, just showing player");
+            // Something is playing, just show the player
+            runOnUiThread(() -> {
+                setPlayerVisible(true);
+                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            });
+            return;
+        }
+
+        // Load queue and start first item on background thread
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        executor.execute(() -> {
+            try {
+                List<FeedItem> queue = DBReader.getQueue();
+                if (queue.isEmpty()) {
+                    Log.d(TAG, "autoStartPlayback: Queue is empty");
+                    return;
+                }
+
+                FeedItem firstItem = queue.get(0);
+                if (firstItem.getMedia() == null) {
+                    Log.d(TAG, "autoStartPlayback: First queue item has no media");
+                    return;
+                }
+
+                Log.d(TAG, "autoStartPlayback: Starting playback of " + firstItem.getTitle());
+
+                // Start playback
+                new PlaybackServiceStarter(this, firstItem.getMedia())
+                        .callEvenIfRunning(true)
+                        .start();
+
+                // Open player UI on main thread
+                runOnUiThread(() -> {
+                    setPlayerVisible(true);
+                    // Small delay to let player initialize before expanding
+                    findViewById(R.id.audioplayerFragment).postDelayed(() -> {
+                        sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                    }, 300);
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "autoStartPlayback: Error", e);
+            }
+        });
+        executor.shutdown();
     }
 
     @Override
