@@ -2,13 +2,15 @@
 
 PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modified for continuous playback with automatic episode management.
 
-<p float="left">
-<img src="docs/images/Screenshot_20251217-122515.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122538.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122600.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122615.png" width="180" />
-<img src="docs/images/Screenshot_20251217-122635.png" width="180" />
-</p>
+<table>
+  <tr>
+    <td><img src="docs/images/Screenshot_20251217-122515.png" width="160" /></td>
+    <td><img src="docs/images/Screenshot_20251217-122538.png" width="160" /></td>
+    <td><img src="docs/images/Screenshot_20251217-122600.png" width="160" /></td>
+    <td><img src="docs/images/Screenshot_20251217-122615.png" width="160" /></td>
+    <td><img src="docs/images/Screenshot_20251217-122635.png" width="160" /></td>
+  </tr>
+</table>
 
 ## What's Different from AntennaPod
 
