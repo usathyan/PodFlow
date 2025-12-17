@@ -85,6 +85,13 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 - Auto-enabled: Activates when Radio Mode is enabled
 - Per-podcast override: Can be disabled in podcast settings
 
+**Android Auto**
+- Full Android Auto integration for hands-free listening
+- Radio Mode quick-start: One tap to start playing your queue
+- Browse queue, downloads, episodes, and subscriptions from car display
+- Voice commands: "Hey Google, play my podcasts"
+- Playback controls: play/pause, skip, next/previous
+
 ### Inherited Features
 
 All standard AntennaPod features remain available:
