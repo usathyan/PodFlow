@@ -1,4 +1,4 @@
-name: Build Release AAB
+name: Build Release
 
 on:
   push:
@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for creating releases
 
     steps:
       - name: Checkout code
@@ -41,24 +43,29 @@ jobs:
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
-      - name: Upload AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: podflow-release-aab
-          path: app/build/outputs/bundle/playRelease/*.aab
-          retention-days: 30
-
-      - name: Upload APK (for direct install)
+      - name: Build Release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           ./gradlew assemblePlayRelease \
             -Pandroid.injected.signing.store.file=$PWD/app/release.keystore \
             -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Rename artifacts for release
+        run: |
+          mv app/build/outputs/bundle/playRelease/*.aab app/build/outputs/bundle/playRelease/PodFlow-${{ github.ref_name || 'release' }}.aab || true
+          mv app/build/outputs/apk/play/release/*.apk app/build/outputs/apk/play/release/PodFlow-${{ github.ref_name || 'release' }}.apk || true
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: podflow-release-aab
+          path: app/build/outputs/bundle/playRelease/*.aab
+          retention-days: 30
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -66,3 +73,16 @@ jobs:
           name: podflow-release-apk
           path: app/build/outputs/apk/play/release/*.apk
           retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            app/build/outputs/bundle/playRelease/*.aab
+            app/build/outputs/apk/play/release/*.apk
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
