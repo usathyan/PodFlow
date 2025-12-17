@@ -118,26 +118,62 @@ PodFlow builds on AntennaPod's mature codebase while adding modern Android compo
 
 **Note**: PodFlow is a hybrid codebase. New features (carousel home) use modern Kotlin/Compose, while inherited screens (subscriptions, queue, settings) retain the original Java/XML implementation. This allows rapid feature development while maintaining stability of the battle-tested AntennaPod core.
 
+## Installation
+
+### Download from Releases (Recommended)
+
+Download the latest signed APK from [GitHub Releases](https://github.com/usathyan/PodFlow/releases):
+
+1. Go to the [Releases page](https://github.com/usathyan/PodFlow/releases)
+2. Download `PodFlow-vX.X.X.apk`
+3. Enable "Install from unknown sources" on your Android device
+4. Install the APK
+
+### Google Play
+
+Coming soon!
+
+---
+
 ## Building from Source
 
 ### Prerequisites
-- Android Studio Hedgehog or newer
 - JDK 17
 - Android SDK with API 35
+- (Optional) Android Studio Hedgehog or newer
 
-### Build Steps
+### Local Development Build
 
 ```bash
 # Clone the repository
 git clone https://github.com/usathyan/PodFlow.git
-cd podflow
+cd PodFlow
 
 # Build debug APK
-./gradlew :app:assembleFreeDebug
+./gradlew assemblePlayDebug
 
 # Install on connected device
-./gradlew :app:installFreeDebug
+./gradlew installPlayDebug
 ```
+
+### Release Build (via GitHub Actions)
+
+Release builds are automated via GitHub Actions:
+
+1. **Manual build**: Go to [Actions](https://github.com/usathyan/PodFlow/actions) → "Build Release" → "Run workflow"
+2. **Tagged release**: Push a version tag to create a GitHub Release with signed APK/AAB
+
+```bash
+# Create and push a version tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This automatically:
+- Builds signed AAB (for Google Play)
+- Builds signed APK (for direct install)
+- Creates a GitHub Release with both files attached
+- Generates release notes from commits
 
 ## Project Structure
 
