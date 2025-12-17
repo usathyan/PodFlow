@@ -381,6 +381,25 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         singleShotDisposables.add(d);
     }
 
+    private static final String RADIO_MODE_MEDIA_ID = "radio_mode_start";
+
+    private MediaBrowserCompat.MediaItem createPlayableRadioModeItem(int queueSize) {
+        Uri uri = new Uri.Builder()
+                .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
+                .authority(getResources().getResourcePackageName(R.drawable.ic_play_48dp_black))
+                .appendPath(getResources().getResourceTypeName(R.drawable.ic_play_48dp_black))
+                .appendPath(getResources().getResourceEntryName(R.drawable.ic_play_48dp_black))
+                .build();
+
+        MediaDescriptionCompat description = new MediaDescriptionCompat.Builder()
+                .setIconUri(uri)
+                .setMediaId(RADIO_MODE_MEDIA_ID)
+                .setTitle(getResources().getString(R.string.radio_mode))
+                .setSubtitle(getResources().getQuantityString(R.plurals.num_episodes, queueSize, queueSize) + " in queue")
+                .build();
+        return new MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE);
+    }
+
     private MediaBrowserCompat.MediaItem createBrowsableMediaItem(
             @StringRes int title, @DrawableRes int icon, int numEpisodes, boolean grid) {
         Uri uri = new Uri.Builder()
@@ -449,12 +468,17 @@ public class PlaybackService extends MediaBrowserServiceCompat {
     private List<MediaBrowserCompat.MediaItem> loadChildrenSynchronous(@NonNull String parentId) {
         List<MediaBrowserCompat.MediaItem> mediaItems = new ArrayList<>();
         if (parentId.equals(getResources().getString(R.string.app_name))) {
+            // Radio Mode - one tap to start playing the queue (shown first for easy access)
+            int queueSize = DBReader.getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.QUEUED));
+            if (queueSize > 0) {
+                mediaItems.add(createPlayableRadioModeItem(queueSize));
+            }
             FeedMedia playable = DBReader.getFeedMedia(PlaybackPreferences.getCurrentlyPlayingFeedMediaId());
             if (playable != null) {
                 mediaItems.add(createBrowsableMediaItem(R.string.current_playing_episode, R.drawable.ic_play_48dp_black, 1, false));
             }
             mediaItems.add(createBrowsableMediaItem(R.string.queue_label, R.drawable.ic_playlist_play_black,
-                    DBReader.getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.QUEUED)), false));
+                    queueSize, false));
             mediaItems.add(createBrowsableMediaItem(R.string.downloads_label, R.drawable.ic_download_black,
                     DBReader.getTotalEpisodeCount(new FeedItemFilter(FeedItemFilter.DOWNLOADED)), false));
             mediaItems.add(createBrowsableMediaItem(R.string.episodes_label, R.drawable.ic_feed_black,
@@ -2084,6 +2108,17 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         @Override
         public void onPlayFromMediaId(String mediaId, Bundle extras) {
             Log.d(TAG, "onPlayFromMediaId: mediaId: " + mediaId + " extras: " + extras.toString());
+
+            // Handle Radio Mode - start playing from the beginning of the queue
+            if (RADIO_MODE_MEDIA_ID.equals(mediaId)) {
+                Log.d(TAG, "Starting Radio Mode from Android Auto");
+                List<FeedItem> queue = DBReader.getQueue();
+                if (!queue.isEmpty() && queue.get(0).getMedia() != null) {
+                    startPlaying(queue.get(0).getMedia(), false);
+                }
+                return;
+            }
+
             FeedMedia p = DBReader.getFeedMedia(Long.parseLong(mediaId));
             if (p != null) {
                 startPlaying(p, false);
