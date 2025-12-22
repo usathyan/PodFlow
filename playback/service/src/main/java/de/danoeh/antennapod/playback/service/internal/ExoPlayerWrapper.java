@@ -201,6 +201,10 @@ public class ExoPlayerWrapper {
         return exoPlayer.getPlayWhenReady();
     }
 
+    public int getAudioSessionId() {
+        return exoPlayer != null ? exoPlayer.getAudioSessionId() : 0;
+    }
+
     public void pause() {
         exoPlayer.pause();
     }
