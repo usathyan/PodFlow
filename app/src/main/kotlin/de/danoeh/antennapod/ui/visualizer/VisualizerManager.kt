@@ -17,6 +17,11 @@ class VisualizerManager {
         private const val CAPTURE_SIZE = 256
         private const val BAR_COUNT = 64
         private const val PEAK_FALL_RATE = 0.08f
+
+        // Noise reduction settings - tuned for speech responsiveness
+        private const val NOISE_FLOOR = 8f         // Minimum magnitude threshold (lowered for speech)
+        private const val MIN_OUTPUT = 0.03f       // Minimum output threshold after scaling
+        private const val SMOOTHING = 0.2f         // Smoothing factor (reduced for faster response)
     }
 
     private val lock = Any()
@@ -32,6 +37,7 @@ class VisualizerManager {
     val isCapturing: StateFlow<Boolean> = _isCapturing.asStateFlow()
 
     private val currentPeaks = FloatArray(BAR_COUNT) { 0f }
+    private val smoothedMagnitudes = FloatArray(BAR_COUNT) { 0f }
 
     /**
      * Initialize the visualizer with an audio session ID.
@@ -176,9 +182,13 @@ class VisualizerManager {
     private fun processFft(fft: ByteArray) {
         val magnitudes = FloatArray(BAR_COUNT)
 
-        // Convert FFT data to magnitudes (skip DC component at index 0)
+        // Skip first bins (very low frequencies / DC-adjacent / rumble) - start at bin 5
+        val startBin = 5
+
+        // Convert FFT data to magnitudes
         for (i in 0 until BAR_COUNT) {
-            val realIndex = (i + 1) * 2
+            val binIndex = i + startBin
+            val realIndex = binIndex * 2
             val imagIndex = realIndex + 1
 
             if (realIndex < fft.size && imagIndex < fft.size) {
@@ -186,22 +196,43 @@ class VisualizerManager {
                 val imag = fft[imagIndex].toFloat()
                 val magnitude = kotlin.math.sqrt(real * real + imag * imag)
 
+                // Frequency-dependent scaling - balance bass reduction with speech preservation
+                // Bars 0-3: very low bass (reduce heavily)
+                // Bars 4-24: speech range ~200Hz-2kHz (preserve well)
+                // Bars 25+: higher frequencies (full weight)
+                val freqWeight = when {
+                    i < 4 -> 0.2f + (i.toFloat() / 4f) * 0.3f    // 0.2 to 0.5 for lowest bass
+                    i < 24 -> 0.5f + ((i - 4).toFloat() / 20f) * 0.4f  // 0.5 to 0.9 for speech range
+                    else -> 0.9f + ((i - 24).toFloat() / (BAR_COUNT - 24)) * 0.1f  // 0.9 to 1.0 for highs
+                }
+
+                // Apply noise floor - ignore values below threshold
+                val filteredMagnitude = if (magnitude < NOISE_FLOOR) 0f else (magnitude - NOISE_FLOOR) * freqWeight
+
                 // Normalize and apply logarithmic scaling for better visual
-                magnitudes[i] = (kotlin.math.log10(1 + magnitude) / 2f).coerceIn(0f, 1f)
+                val scaled = (kotlin.math.log10(1 + filteredMagnitude) / 2.5f).coerceIn(0f, 1f)
+
+                // Apply minimum output threshold
+                magnitudes[i] = if (scaled < MIN_OUTPUT) 0f else scaled
             }
+        }
+
+        // Apply smoothing between frames to reduce flickering
+        for (i in 0 until BAR_COUNT) {
+            smoothedMagnitudes[i] = smoothedMagnitudes[i] * SMOOTHING + magnitudes[i] * (1 - SMOOTHING)
         }
 
         // Update peak levels with fall-off
         for (i in 0 until BAR_COUNT) {
-            if (magnitudes[i] > currentPeaks[i]) {
-                currentPeaks[i] = magnitudes[i]
+            if (smoothedMagnitudes[i] > currentPeaks[i]) {
+                currentPeaks[i] = smoothedMagnitudes[i]
             } else {
-                currentPeaks[i] = (currentPeaks[i] - PEAK_FALL_RATE).coerceAtLeast(magnitudes[i])
+                currentPeaks[i] = (currentPeaks[i] - PEAK_FALL_RATE).coerceAtLeast(smoothedMagnitudes[i])
             }
         }
 
         _visualizerData.value = _visualizerData.value.copy(
-            fftData = magnitudes,
+            fftData = smoothedMagnitudes.copyOf(),
             peakLevels = currentPeaks.copyOf()
         )
     }

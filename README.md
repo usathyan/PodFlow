@@ -63,6 +63,7 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 | Download strategy | All new episodes | Latest episode per podcast |
 | Episode lifecycle | Manual deletion | Auto-delete after playback |
 | Volume handling | Per-episode manual boost | Automatic normalization |
+| Audio visualizer | None | Studio/Liquid wave styles |
 | Default mode | Standard playback | Radio Mode |
 
 ### Feature Details
@@ -84,6 +85,17 @@ PodFlow is a fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) modi
 - DynamicsProcessing: Compresses dynamic range and limits peaks
 - Auto-enabled: Activates when Radio Mode is enabled
 - Per-podcast override: Can be disabled in podcast settings
+
+**Audio Visualizer**
+- Tap album art to reveal visualizer: Tap the album artwork on the player screen to flip and show the visualizer
+- Two visualization styles:
+  - **Studio**: Smooth flowing waves with pulsating colors that respond to audio frequencies
+  - **Liquid**: Organic morphing blob with color-shifting gradients
+- Swipe to change styles: Swipe left/right on visualizer to switch between styles
+- Style indicator dots: Visual indicator shows current style
+- Long-press to play/pause: While visualizer is showing, long-press to control playback
+- Speech-optimized: FFT processing tuned for podcast vocals with noise floor filtering
+- Requires RECORD_AUDIO permission: Needed to capture audio data for visualization
 
 **Android Auto**
 - Full Android Auto integration for hands-free listening
@@ -122,6 +134,7 @@ PodFlow builds on AntennaPod's mature codebase while adding modern Android compo
 | Networking | OkHttp | OkHttp |
 | Image Loading | Glide | + **Coil** (Compose screens) |
 | Media | ExoPlayer (single) | ExoPlayer (gapless playback) |
+| Audio Visualization | None | **Android Visualizer API** (FFT + Waveform) |
 
 **Note**: PodFlow is a hybrid codebase. New features (carousel home) use modern Kotlin/Compose, while inherited screens (subscriptions, queue, settings) retain the original Java/XML implementation. This allows rapid feature development while maintaining stability of the battle-tested AntennaPod core.
 
@@ -188,6 +201,11 @@ This automatically:
 app/src/main/kotlin/de/danoeh/antennapod/
 ├── ui/
 │   ├── theme/              # Material 3 theme (Color, Type, Shape, Theme)
+│   ├── visualizer/         # Audio visualizer components
+│   │   ├── VisualizerManager.kt      # Audio capture using Android Visualizer API
+│   │   ├── VisualizerViewModel.kt    # State management for visualizer
+│   │   ├── StudioVisualizer.kt       # Flowing waves with pulsating colors
+│   │   └── LiquidVisualizer.kt       # Organic morphing blob style
 │   └── screen/
 │       ├── home/
 │       │   ├── carousel/   # Carousel home screen (CommuteSession, ViewModel, UI)
