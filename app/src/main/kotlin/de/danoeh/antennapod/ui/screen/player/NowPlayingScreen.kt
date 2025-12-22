@@ -65,7 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import de.danoeh.antennapod.ui.components.FlipCard
 import de.danoeh.antennapod.ui.theme.PodFlowPurple
+import de.danoeh.antennapod.ui.visualizer.VisualizerContainer
+import de.danoeh.antennapod.ui.visualizer.VisualizerViewModel
 
 /**
  * Now Playing Screen - Full screen audio player
@@ -140,10 +143,32 @@ fun NowPlayingScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Large artwork
-            ArtworkSection(
-                imageUrl = playbackState.imageUrl,
-                title = playbackState.title
+            // Flippable artwork/visualizer
+            val visualizerViewModel: VisualizerViewModel = viewModel()
+            val visualizerState by visualizerViewModel.uiState.collectAsState()
+
+            FlipCard(
+                isFlipped = visualizerState.isVisible,
+                onFlip = { visualizerViewModel.toggleVisibility() },
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .aspectRatio(1f)
+                    .shadow(24.dp, RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.dp)),
+                front = {
+                    ArtworkSection(
+                        imageUrl = playbackState.imageUrl,
+                        title = playbackState.title
+                    )
+                },
+                back = {
+                    VisualizerContainer(
+                        data = visualizerState.data,
+                        currentStyle = visualizerState.style,
+                        albumArtUrl = playbackState.imageUrl,
+                        onStyleChange = { visualizerViewModel.setStyle(it) }
+                    )
+                }
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -205,39 +230,30 @@ private fun ArtworkSection(
     imageUrl: String?,
     title: String
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth(0.85f)
-            .aspectRatio(1f)
-            .shadow(24.dp, RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        if (imageUrl != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(imageUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+    if (imageUrl != null) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(imageUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+    } else {
+        // Placeholder
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        } else {
-            // Placeholder
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
         }
     }
 }
