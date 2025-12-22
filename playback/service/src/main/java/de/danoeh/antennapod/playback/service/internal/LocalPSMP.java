@@ -626,6 +626,14 @@ public class LocalPSMP extends PlaybackServiceMediaPlayer {
         return mediaPlayer.getSelectedAudioTrack();
     }
 
+    @Override
+    public int getAudioSessionId() {
+        if (mediaPlayer == null) {
+            return 0;
+        }
+        return mediaPlayer.getAudioSessionId();
+    }
+
     private void createMediaPlayer() {
         if (mediaPlayer != null) {
             mediaPlayer.release();

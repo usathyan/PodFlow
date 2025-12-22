@@ -53,6 +53,14 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.lifecycle.ViewModelProvider;
+import de.danoeh.antennapod.ui.visualizer.VisualizerBridge;
+import de.danoeh.antennapod.ui.visualizer.VisualizerViewModel;
+
 import static android.widget.LinearLayout.LayoutParams.MATCH_PARENT;
 import static android.widget.LinearLayout.LayoutParams.WRAP_CONTENT;
 
@@ -66,11 +74,33 @@ public class CoverFragment extends Fragment {
     private Disposable disposable;
     private int displayedChapterIndex = -1;
     private Playable media;
+    private static final String KEY_VISUALIZER_SHOWING = "visualizer_showing";
+    private VisualizerViewModel visualizerViewModel;
+    private volatile boolean isVisualizerShowing = false;
+    private volatile boolean isVisualizerInitialized = false;
+
+    private final ActivityResultLauncher<String> requestPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+                visualizerViewModel.onPermissionResult(isGranted);
+                if (isGranted) {
+                    // Permission granted, now show visualizer
+                    showVisualizer();
+                } else {
+                    // Permission denied - user can't use visualizer without microphone permission
+                    Log.w(TAG, "RECORD_AUDIO permission denied for visualizer");
+                }
+            });
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         viewBinding = CoverFragmentBinding.inflate(inflater);
+        // Single tap on cover to play/pause (original behavior)
         viewBinding.imgvCover.setOnClickListener(v -> onPlayPause());
+        // Double tap on cover to toggle visualizer
+        viewBinding.imgvCover.setOnLongClickListener(v -> {
+            toggleVisualizer();
+            return true;
+        });
         viewBinding.openDescription.setOnClickListener(view -> ((AudioPlayerFragment) requireParentFragment())
                 .scrollToPage(AudioPlayerFragment.POS_DESCRIPTION, true));
         ColorFilter colorFilter = BlendModeColorFilterCompat.createBlendModeColorFilterCompat(
@@ -88,6 +118,91 @@ public class CoverFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         configureForOrientation(getResources().getConfiguration());
+        setupVisualizer();
+
+        // Restore visualizer visibility state after config change
+        if (savedInstanceState != null && savedInstanceState.getBoolean(KEY_VISUALIZER_SHOWING, false)) {
+            // Defer showing visualizer until after onStart when controller is available
+            view.post(() -> {
+                if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    showVisualizer();
+                }
+            });
+        }
+    }
+
+    private void setupVisualizer() {
+        visualizerViewModel = new ViewModelProvider(this).get(VisualizerViewModel.class);
+
+        VisualizerBridge.setupVisualizerView(
+            viewBinding.visualizerView,
+            visualizerViewModel,
+            () -> media != null ? media.getImageLocation() : null
+        );
+
+        // Single tap on visualizer to play/pause (same as cover)
+        viewBinding.visualizerView.setOnClickListener(v -> onPlayPause());
+        // Long press on visualizer to toggle back to cover
+        viewBinding.visualizerView.setOnLongClickListener(v -> {
+            toggleVisualizer();
+            return true;
+        });
+    }
+
+    private void toggleVisualizer() {
+        if (isVisualizerShowing) {
+            // Hide visualizer, show cover
+            hideVisualizer();
+        } else {
+            // Check permission before showing visualizer
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED) {
+                visualizerViewModel.onPermissionResult(true);
+                showVisualizer();
+            } else {
+                // Request permission
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+            }
+        }
+    }
+
+    private void showVisualizer() {
+        isVisualizerShowing = true;
+
+        // Show visualizer, hide cover
+        viewBinding.imgvCover.setVisibility(View.GONE);
+        viewBinding.visualizerView.setVisibility(View.VISIBLE);
+
+        // Try to initialize visualizer with audio session from playback service
+        tryInitializeVisualizer();
+        visualizerViewModel.setVisibility(true);
+    }
+
+    private void tryInitializeVisualizer() {
+        if (isVisualizerInitialized) {
+            return; // Already initialized
+        }
+        if (controller != null) {
+            int audioSessionId = controller.getAudioSessionId();
+            if (audioSessionId != 0) {
+                Log.d(TAG, "Initializing visualizer with audio session ID: " + audioSessionId);
+                visualizerViewModel.initializeVisualizer(audioSessionId);
+                isVisualizerInitialized = true;
+            } else {
+                Log.d(TAG, "Cannot initialize visualizer yet - no audio session ID (playback may not have started)");
+            }
+        }
+    }
+
+    private void hideVisualizer() {
+        isVisualizerShowing = false;
+        isVisualizerInitialized = false; // Reset so it can be re-initialized next time
+
+        // Show cover, hide visualizer
+        viewBinding.imgvCover.setVisibility(View.VISIBLE);
+        viewBinding.visualizerView.setVisibility(View.GONE);
+        visualizerViewModel.setVisibility(false);
     }
 
     private void loadMediaInfo(boolean includingChapters) {
@@ -111,6 +226,11 @@ public class CoverFragment extends Fragment {
                     displayMediaInfo(media);
                     if (media.getChapters() == null && !includingChapters) {
                         loadMediaInfo(true);
+                    }
+                    // Re-initialize visualizer when media changes (new podcast = new audio session)
+                    if (isVisualizerShowing) {
+                        isVisualizerInitialized = false; // Reset to force re-initialization
+                        tryInitializeVisualizer();
                     }
                 }, error -> Log.e(TAG, Log.getStackTraceString(error)));
     }
@@ -195,7 +315,7 @@ public class CoverFragment extends Fragment {
     }
 
     private void refreshChapterData(int chapterIndex) {
-        if (chapterIndex > -1) {
+        if (chapterIndex > -1 && media != null && media.getChapters() != null) {
             if (media.getPosition() > media.getDuration() || chapterIndex >= media.getChapters().size() - 1) {
                 displayedChapterIndex = media.getChapters().size() - 1;
                 viewBinding.butNextChapter.setVisibility(View.INVISIBLE);
@@ -261,12 +381,24 @@ public class CoverFragment extends Fragment {
     public void onStop() {
         super.onStop();
 
+        // Release visualizer resources to prevent battery drain and AudioRecord conflicts
+        if (visualizerViewModel != null) {
+            visualizerViewModel.releaseVisualizer();
+        }
+        isVisualizerInitialized = false;
+
         if (disposable != null) {
             disposable.dispose();
         }
         controller.release();
         controller = null;
         EventBus.getDefault().unregister(this);
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(KEY_VISUALIZER_SHOWING, isVisualizerShowing);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -277,6 +409,12 @@ public class CoverFragment extends Fragment {
         int newChapterIndex = Chapter.getAfterPosition(media.getChapters(), event.getPosition());
         if (newChapterIndex > -1 && newChapterIndex != displayedChapterIndex) {
             refreshChapterData(newChapterIndex);
+        }
+
+        // If visualizer is showing but not initialized, try to initialize it now
+        // (playback has started, so we should have an audio session ID)
+        if (isVisualizerShowing && !isVisualizerInitialized) {
+            tryInitializeVisualizer();
         }
     }
 
