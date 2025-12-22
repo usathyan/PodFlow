@@ -19,7 +19,10 @@ class VisualizerManager {
         private const val PEAK_FALL_RATE = 0.08f
     }
 
+    private val lock = Any()
+    @Volatile
     private var visualizer: Visualizer? = null
+    @Volatile
     private var audioSessionId: Int = 0
 
     private val _visualizerData = MutableStateFlow(VisualizerData())
@@ -33,94 +36,131 @@ class VisualizerManager {
     /**
      * Initialize the visualizer with an audio session ID.
      * Must be called after playback starts.
+     * Thread-safe: synchronized on internal lock.
      */
     fun initialize(sessionId: Int): Boolean {
+        Log.d(TAG, "initialize() called with sessionId=$sessionId")
         if (sessionId == 0) {
             Log.w(TAG, "Invalid audio session ID: 0")
             return false
         }
 
-        if (audioSessionId == sessionId && visualizer != null) {
-            Log.d(TAG, "Already initialized with session $sessionId")
-            return true
-        }
-
-        release()
-        audioSessionId = sessionId
-
-        return try {
-            visualizer = Visualizer(sessionId).apply {
-                captureSize = CAPTURE_SIZE
-                setDataCaptureListener(
-                    object : Visualizer.OnDataCaptureListener {
-                        override fun onWaveFormDataCapture(
-                            visualizer: Visualizer?,
-                            waveform: ByteArray?,
-                            samplingRate: Int
-                        ) {
-                            waveform?.let { processWaveform(it) }
-                        }
-
-                        override fun onFftDataCapture(
-                            visualizer: Visualizer?,
-                            fft: ByteArray?,
-                            samplingRate: Int
-                        ) {
-                            fft?.let { processFft(it) }
-                        }
-                    },
-                    Visualizer.getMaxCaptureRate() / 2,
-                    true,
-                    true
-                )
+        synchronized(lock) {
+            if (audioSessionId == sessionId && visualizer != null) {
+                Log.d(TAG, "Already initialized with session $sessionId")
+                return true
             }
-            Log.d(TAG, "Visualizer initialized for session $sessionId")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize visualizer: ${e.message}")
-            false
+
+            releaseInternal()
+            audioSessionId = sessionId
+
+            return try {
+                Log.d(TAG, "Creating Visualizer for session $sessionId")
+                visualizer = Visualizer(sessionId).apply {
+                    captureSize = CAPTURE_SIZE
+                    Log.d(TAG, "Setting data capture listener, maxCaptureRate=${Visualizer.getMaxCaptureRate()}")
+                    setDataCaptureListener(
+                        object : Visualizer.OnDataCaptureListener {
+                            override fun onWaveFormDataCapture(
+                                visualizer: Visualizer?,
+                                waveform: ByteArray?,
+                                samplingRate: Int
+                            ) {
+                                waveform?.let { processWaveform(it) }
+                            }
+
+                            override fun onFftDataCapture(
+                                visualizer: Visualizer?,
+                                fft: ByteArray?,
+                                samplingRate: Int
+                            ) {
+                                fft?.let { processFft(it) }
+                            }
+                        },
+                        Visualizer.getMaxCaptureRate() / 2,
+                        true,
+                        true
+                    )
+                }
+                Log.d(TAG, "Visualizer initialized successfully for session $sessionId")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize visualizer: ${e.message}", e)
+                false
+            }
         }
     }
 
     /**
      * Start capturing audio data.
+     * Thread-safe: synchronized on internal lock.
      */
     fun startCapture() {
-        visualizer?.let {
-            try {
-                it.enabled = true
-                _isCapturing.value = true
-                Log.d(TAG, "Visualizer capture started")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to start capture: ${e.message}")
-            }
+        Log.d(TAG, "startCapture() called, visualizer=${visualizer != null}")
+        synchronized(lock) {
+            visualizer?.let {
+                try {
+                    it.enabled = true
+                    _isCapturing.value = true
+                    Log.d(TAG, "Visualizer capture started successfully, enabled=${it.enabled}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start capture: ${e.message}", e)
+                }
+            } ?: Log.w(TAG, "startCapture() called but visualizer is null!")
         }
     }
 
     /**
      * Stop capturing audio data.
+     * Thread-safe: synchronized on internal lock.
      */
     fun stopCapture() {
-        visualizer?.let {
-            try {
-                it.enabled = false
-                _isCapturing.value = false
-                Log.d(TAG, "Visualizer capture stopped")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to stop capture: ${e.message}")
+        synchronized(lock) {
+            visualizer?.let {
+                try {
+                    it.enabled = false
+                    _isCapturing.value = false
+                    Log.d(TAG, "Visualizer capture stopped")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to stop capture: ${e.message}")
+                }
             }
         }
     }
 
     /**
      * Release the visualizer resources.
+     * Thread-safe: synchronized on internal lock.
      */
     fun release() {
-        stopCapture()
+        synchronized(lock) {
+            stopCaptureInternal()
+            visualizer?.release()
+            visualizer = null
+            audioSessionId = 0
+            Log.d(TAG, "Visualizer released")
+        }
+    }
+
+    /** Internal stop without acquiring lock (called from release which already holds lock) */
+    private fun stopCaptureInternal() {
+        visualizer?.let {
+            try {
+                it.enabled = false
+                _isCapturing.value = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop capture: ${e.message}")
+            }
+        }
+    }
+
+    /** Internal release without acquiring lock (called from initialize which already holds lock) */
+    private fun releaseInternal() {
+        stopCaptureInternal()
         visualizer?.release()
         visualizer = null
         audioSessionId = 0
-        Log.d(TAG, "Visualizer released")
+        Log.d(TAG, "Visualizer released (internal)")
     }
 
     private fun processWaveform(waveform: ByteArray) {

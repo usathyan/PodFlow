@@ -105,6 +105,14 @@ class VisualizerViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Release visualizer resources.
+     * Call this in Fragment's onStop() to prevent resource leaks.
+     */
+    fun releaseVisualizer() {
+        visualizerManager.release()
+    }
+
     override fun onCleared() {
         super.onCleared()
         visualizerManager.release()

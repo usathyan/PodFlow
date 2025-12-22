@@ -216,6 +216,12 @@ public abstract class PlaybackServiceMediaPlayer {
 
     public abstract int getSelectedAudioTrack();
 
+    /**
+     * Returns the audio session ID for the current playback, or 0 if not available.
+     * This is used for audio visualizers.
+     */
+    public abstract int getAudioSessionId();
+
     public void skip() {
         if (getPosition() < 1000) {
             Log.d(TAG, "Ignoring skip, is in first second of playback");

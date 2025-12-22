@@ -500,6 +500,12 @@ public class CastPsmp extends PlaybackServiceMediaPlayer {
     }
 
     @Override
+    public int getAudioSessionId() {
+        // Audio is playing on cast device, no local audio session
+        return 0;
+    }
+
+    @Override
     protected void endPlayback(boolean hasEnded, boolean wasSkipped, boolean shouldContinue,
                                     boolean toStoppedState) {
         Log.d(TAG, "endPlayback() called");

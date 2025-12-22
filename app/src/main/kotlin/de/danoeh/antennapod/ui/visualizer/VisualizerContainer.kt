@@ -74,12 +74,8 @@ fun VisualizerContainer(
                 }
         ) {
             when (currentStyle) {
-                VisualizerStyle.WINAMP -> WinampVisualizer(data = data)
-                VisualizerStyle.CIRCULAR -> CircularVisualizer(data = data)
-                VisualizerStyle.WAVEFORM -> WaveformVisualizer(
-                    data = data,
-                    albumArtUrl = albumArtUrl
-                )
+                VisualizerStyle.STUDIO -> StudioVisualizer(data = data)
+                VisualizerStyle.LIQUID -> LiquidVisualizer(data = data)
             }
         }
 

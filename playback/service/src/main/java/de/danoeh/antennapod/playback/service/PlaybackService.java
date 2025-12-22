@@ -2045,6 +2045,13 @@ public class PlaybackService extends MediaBrowserServiceCompat {
         }
     }
 
+    public int getAudioSessionId() {
+        if (mediaPlayer == null) {
+            return 0;
+        }
+        return mediaPlayer.getAudioSessionId();
+    }
+
     public boolean isStreaming() {
         return mediaPlayer.isStreaming();
     }

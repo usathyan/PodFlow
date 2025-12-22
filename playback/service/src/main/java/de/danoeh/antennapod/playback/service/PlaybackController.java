@@ -454,6 +454,13 @@ public abstract class PlaybackController {
         }
     }
 
+    public int getAudioSessionId() {
+        if (playbackService != null) {
+            return playbackService.getAudioSessionId();
+        }
+        return 0;
+    }
+
     public boolean isPlayingVideoLocally() {
         if (PlaybackService.isCasting()) {
             return false;

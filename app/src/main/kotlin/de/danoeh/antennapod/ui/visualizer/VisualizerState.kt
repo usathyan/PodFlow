@@ -29,9 +29,8 @@ data class VisualizerData(
  * Available visualizer styles
  */
 enum class VisualizerStyle {
-    WINAMP,      // Classic spectrum bars + oscilloscope
-    CIRCULAR,    // Radial frequency display
-    WAVEFORM     // Minimal line waveform
+    STUDIO,      // VU meters + spectrum bars (pro audio style)
+    LIQUID       // Organic flowing waves with morphing blob
 }
 
 /**
@@ -39,7 +38,7 @@ enum class VisualizerStyle {
  */
 data class VisualizerUiState(
     val isVisible: Boolean = false,
-    val style: VisualizerStyle = VisualizerStyle.WINAMP,
+    val style: VisualizerStyle = VisualizerStyle.STUDIO,
     val data: VisualizerData = VisualizerData(),
     val hasPermission: Boolean = false,
     val isCapturing: Boolean = false
