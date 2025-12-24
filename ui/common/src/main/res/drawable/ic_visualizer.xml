@@ -1,0 +1,14 @@
+<vector android:height="24dp"
+    android:viewportHeight="24.0" android:viewportWidth="24.0"
+    android:width="24dp" xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Equalizer bars - outline/unfilled style (3 bars) -->
+    <path android:strokeColor="?attr/action_icon_color"
+        android:strokeWidth="2"
+        android:pathData="M4,20V10"/>
+    <path android:strokeColor="?attr/action_icon_color"
+        android:strokeWidth="2"
+        android:pathData="M12,20V4"/>
+    <path android:strokeColor="?attr/action_icon_color"
+        android:strokeWidth="2"
+        android:pathData="M20,20V14"/>
+</vector>

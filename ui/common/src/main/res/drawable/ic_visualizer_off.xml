@@ -1,0 +1,16 @@
+<vector android:height="24dp"
+    android:viewportHeight="24.0" android:viewportWidth="24.0"
+    android:width="24dp" xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Equalizer bars - filled style (3 bars) with X overlay -->
+    <path android:fillColor="?attr/action_icon_color"
+        android:pathData="M3,20V10h2v10z"/>
+    <path android:fillColor="?attr/action_icon_color"
+        android:pathData="M11,20V4h2v16z"/>
+    <path android:fillColor="?attr/action_icon_color"
+        android:pathData="M19,20V14h2v6z"/>
+    <!-- X mark to indicate "turn off" -->
+    <path android:strokeColor="?attr/action_icon_color"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M16,6L22,12M22,6L16,12"/>
+</vector>

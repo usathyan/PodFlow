@@ -498,7 +498,10 @@ public class AudioPlayerFragment extends Fragment implements
         }
 
         final int itemId = item.getItemId();
-        if (itemId == R.id.disable_sleeptimer_item || itemId == R.id.set_sleeptimer_item) {
+        if (itemId == R.id.show_visualizer_item || itemId == R.id.hide_visualizer_item) {
+            toggleVisualizer();
+            return true;
+        } else if (itemId == R.id.disable_sleeptimer_item || itemId == R.id.set_sleeptimer_item) {
             new SleepTimerDialog().show(getChildFragmentManager(), "SleepTimerDialog");
             return true;
         } else if (itemId == R.id.transcript_item) {
@@ -512,6 +515,32 @@ public class AudioPlayerFragment extends Fragment implements
             return true;
         }
         return false;
+    }
+
+    private void toggleVisualizer() {
+        Fragment coverFragment = getChildFragmentManager().findFragmentByTag("f0");
+        if (coverFragment instanceof CoverFragment) {
+            ((CoverFragment) coverFragment).toggleVisualizer();
+        }
+    }
+
+    /**
+     * Called by CoverFragment when visualizer state changes.
+     */
+    public void onVisualizerStateChanged(boolean isShowing) {
+        updateVisualizerMenuIcon(isShowing);
+    }
+
+    private void updateVisualizerMenuIcon(boolean isShowing) {
+        if (toolbar.getMenu().size() == 0) {
+            return;
+        }
+        MenuItem showItem = toolbar.getMenu().findItem(R.id.show_visualizer_item);
+        MenuItem hideItem = toolbar.getMenu().findItem(R.id.hide_visualizer_item);
+        if (showItem != null && hideItem != null) {
+            showItem.setVisible(!isShowing);
+            hideItem.setVisible(isShowing);
+        }
     }
 
     private void openFeed(Feed feed) {

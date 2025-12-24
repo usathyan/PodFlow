@@ -94,13 +94,8 @@ public class CoverFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         viewBinding = CoverFragmentBinding.inflate(inflater);
-        // Single tap on cover to play/pause (original behavior)
+        // Single tap on cover to play/pause
         viewBinding.imgvCover.setOnClickListener(v -> onPlayPause());
-        // Double tap on cover to toggle visualizer
-        viewBinding.imgvCover.setOnLongClickListener(v -> {
-            toggleVisualizer();
-            return true;
-        });
         viewBinding.openDescription.setOnClickListener(view -> ((AudioPlayerFragment) requireParentFragment())
                 .scrollToPage(AudioPlayerFragment.POS_DESCRIPTION, true));
         ColorFilter colorFilter = BlendModeColorFilterCompat.createBlendModeColorFilterCompat(
@@ -136,21 +131,19 @@ public class CoverFragment extends Fragment {
         visualizerViewModel = new ViewModelProvider(this).get(VisualizerViewModel.class);
 
         VisualizerBridge.setupVisualizerView(
-            viewBinding.visualizerView,
-            visualizerViewModel,
-            () -> media != null ? media.getImageLocation() : null
+                viewBinding.visualizerView,
+                visualizerViewModel,
+                () -> media != null ? media.getImageLocation() : null
         );
 
         // Single tap on visualizer to play/pause (same as cover)
         viewBinding.visualizerView.setOnClickListener(v -> onPlayPause());
-        // Long press on visualizer to toggle back to cover
-        viewBinding.visualizerView.setOnLongClickListener(v -> {
-            toggleVisualizer();
-            return true;
-        });
     }
 
-    private void toggleVisualizer() {
+    /**
+     * Toggle visualizer visibility. Called from AudioPlayerFragment toolbar button.
+     */
+    public void toggleVisualizer() {
         if (isVisualizerShowing) {
             // Hide visualizer, show cover
             hideVisualizer();
@@ -164,6 +157,21 @@ public class CoverFragment extends Fragment {
                 // Request permission
                 requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
             }
+        }
+        notifyVisualizerStateChanged();
+    }
+
+    /**
+     * Returns whether the visualizer is currently showing.
+     */
+    public boolean isVisualizerShowing() {
+        return isVisualizerShowing;
+    }
+
+    private void notifyVisualizerStateChanged() {
+        Fragment parent = getParentFragment();
+        if (parent instanceof AudioPlayerFragment) {
+            ((AudioPlayerFragment) parent).onVisualizerStateChanged(isVisualizerShowing);
         }
     }
 

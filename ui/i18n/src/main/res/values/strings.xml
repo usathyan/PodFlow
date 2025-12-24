@@ -291,6 +291,8 @@
     <string name="transcript_follow_audio_label">Follow audio</string>
     <string name="no_transcript_label">No transcript</string>
     <string name="remove_from_favorite_label">Remove from favorites</string>
+    <string name="show_visualizer">Show visualizer</string>
+    <string name="hide_visualizer">Hide visualizer</string>
     <string name="visit_website_label">Visit website</string>
     <string name="visit_social_interact_label">Show comments</string>
     <string name="visit_social_interact_confirm_dialog_title">You are leaving PodFlow</string>
