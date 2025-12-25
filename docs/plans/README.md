@@ -23,39 +23,44 @@
 
 | Plan | Description | Complexity |
 |------|-------------|------------|
+| [iOS Cross-Platform Strategy](2025-12-25-ios-cross-platform-strategy.md) | Run PodFlow on Android AND iOS/iPadOS | **Major** |
 | [Cover Flow Home Screen](2025-12-23-cover-flow-design.md) | iPod-style 3D Cover Flow with reflections and momentum scrolling | High |
 | [AI Podcast Player](2025-12-15-ai-podcast-player-design.md) | OpenRouter AI integration for smart playlist curation | High |
 
 ---
 
-## Next Up: Cover Flow Feature
+## Next Up: iOS Cross-Platform
 
-**Target:** Replace home screen carousel with classic iPod-style Cover Flow
+**Target:** Run PodFlow on both Android AND iOS/iPadOS
 
 ### Readiness Assessment
 
 **Prerequisites (Complete):**
-- [x] Basic app structure and navigation
-- [x] Home screen with podcast carousel exists
-- [x] Jetpack Compose UI foundation
-- [x] Podcast data models and subscriptions working
+- [x] Android app stable and published to Play Store
+- [x] PodFlow-specific features implemented (visualizer)
+- [x] Modular codebase structure
+- [x] Kotlin code for new features
 
-**Technical Requirements:**
-- [ ] Implement 3D transforms with `graphicsLayer`
-- [ ] Create reflection effect with gradient fade
-- [ ] Add momentum-based scrolling with velocity tracking
-- [ ] Handle cover scaling/rotation animations
-- [ ] Integrate tap-to-play functionality
+**Architecture Decision Required:**
 
-**Estimated Scope:**
-- New Composable: `CoverFlowCarousel.kt`
-- Modify: Home screen to use new carousel
-- Assets: None (uses existing podcast artwork)
+| Option | Code Reuse | Timeline | Recommendation |
+|--------|------------|----------|----------------|
+| **Kotlin Multiplatform** | ~60% | 14-20 weeks | ⭐ Best long-term |
+| Flutter | ~95% | 12-16 weeks | Full rewrite |
+| Native iOS | 0% | 16-24 weeks | Most effort |
 
-### Recommended Approach
-1. Create feature branch: `feature/cover-flow`
-2. Prototype basic 3D transforms
-3. Add reflection rendering
-4. Implement gesture/momentum handling
-5. Polish animations and transitions
-6. Integration testing
+### PodFlow Features to Port (Priority)
+1. Audio Visualizer (platform-specific APIs)
+2. Cover Flow carousel
+3. All playback features
+4. Download management
+
+### Recommended Approach (KMP)
+1. Create feature branch: `feature/ios-kmp`
+2. Extract shared module with data models
+3. Set up iOS project with SwiftUI
+4. Implement audio playback (AVFoundation)
+5. Port visualizer (Accelerate framework)
+6. Add remaining features incrementally
+
+See full details: [iOS Cross-Platform Strategy](2025-12-25-ios-cross-platform-strategy.md)
