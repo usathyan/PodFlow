@@ -1,6 +1,6 @@
 # PodFlow Development Plans
 
-> Last updated: December 24, 2025
+> Last updated: December 25, 2025
 
 ## Completed
 
@@ -15,6 +15,7 @@
 
 | Plan | Description | Status |
 |------|-------------|--------|
+| [iOS Cross-Platform Strategy](2025-12-25-ios-cross-platform-strategy.md) | Flutter rewrite for Android + iOS | **In Progress** |
 | [PodFlow Production App](2025-12-11-podflow-production-app-design.md) | Complete tech stack, Material 3 UI, multi-phase roadmap | In Progress |
 | [Radio Mode Crash Fix](2025-12-15-radio-mode-crash-fix-and-always-fresh-priority-design.md) | Fix ClassCastException, implement always-fresh priority | Approved |
 | [Commute Radio Carousel](2025-12-15-commute-radio-carousel-design.md) | Horizontal carousel for daily commute use case | Approved |
@@ -23,44 +24,51 @@
 
 | Plan | Description | Complexity |
 |------|-------------|------------|
-| [iOS Cross-Platform Strategy](2025-12-25-ios-cross-platform-strategy.md) | Run PodFlow on Android AND iOS/iPadOS | **Major** |
 | [Cover Flow Home Screen](2025-12-23-cover-flow-design.md) | iPod-style 3D Cover Flow with reflections and momentum scrolling | High |
 | [AI Podcast Player](2025-12-15-ai-podcast-player-design.md) | OpenRouter AI integration for smart playlist curation | High |
 
 ---
 
-## Next Up: iOS Cross-Platform
+## Active: Flutter Cross-Platform Rewrite
 
-**Target:** Run PodFlow on both Android AND iOS/iPadOS
+**Decision:** Flutter (December 25, 2025)
+**Branch:** `feature/flutter-rewrite`
+**Project:** `/podflow_flutter/`
 
-### Readiness Assessment
+### Why Flutter?
+- ~95% code sharing between Android and iOS
+- Single codebase, single language (Dart)
+- Strong audio ecosystem (just_audio, audio_service)
+- Hot reload for fast development
 
-**Prerequisites (Complete):**
-- [x] Android app stable and published to Play Store
-- [x] PodFlow-specific features implemented (visualizer)
-- [x] Modular codebase structure
-- [x] Kotlin code for new features
+### Project Structure (Created)
+```
+podflow_flutter/
+├── lib/
+│   ├── core/
+│   │   ├── models/       # Podcast, Episode
+│   │   ├── services/     # Audio, Network
+│   │   └── repositories/ # Data access
+│   ├── features/
+│   │   ├── player/
+│   │   ├── subscriptions/
+│   │   ├── downloads/
+│   │   └── visualizer/
+│   └── shared/widgets/
+└── test/
+```
 
-**Architecture Decision Required:**
-
-| Option | Code Reuse | Timeline | Recommendation |
-|--------|------------|----------|----------------|
-| **Kotlin Multiplatform** | ~60% | 14-20 weeks | ⭐ Best long-term |
-| Flutter | ~95% | 12-16 weeks | Full rewrite |
-| Native iOS | 0% | 16-24 weeks | Most effort |
+### Key Dependencies
+- `just_audio` - Cross-platform audio playback
+- `audio_service` - Background playback
+- `flutter_riverpod` - State management
+- `webfeed_plus` - RSS parsing
+- `sqflite` - Local database
 
 ### PodFlow Features to Port (Priority)
-1. Audio Visualizer (platform-specific APIs)
+1. Audio Visualizer (custom FFT implementation)
 2. Cover Flow carousel
 3. All playback features
 4. Download management
-
-### Recommended Approach (KMP)
-1. Create feature branch: `feature/ios-kmp`
-2. Extract shared module with data models
-3. Set up iOS project with SwiftUI
-4. Implement audio playback (AVFoundation)
-5. Port visualizer (Accelerate framework)
-6. Add remaining features incrementally
 
 See full details: [iOS Cross-Platform Strategy](2025-12-25-ios-cross-platform-strategy.md)

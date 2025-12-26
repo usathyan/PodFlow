@@ -1,8 +1,24 @@
 # PodFlow iOS & Cross-Platform Strategy
 
-> **Status:** Planning
-> **Priority:** Best long-term architecture
+> **Status:** In Progress
+> **Decision:** Flutter (Option B)
+> **Priority:** Maximum code sharing (~95%)
 > **Goal:** Run PodFlow on both Android and iOS/iPadOS
+
+## Decision: Flutter Rewrite
+
+**Chosen:** December 25, 2025
+
+Flutter was selected for:
+- **Maximum code sharing** (~95% shared between Android and iOS)
+- **Single codebase maintenance** - one Dart codebase instead of two
+- **Strong ecosystem** - mature audio playback packages (just_audio, audio_service)
+- **Faster development** - hot reload, single language (Dart)
+
+**Branch:** `feature/flutter-rewrite`
+**Project location:** `/podflow_flutter/`
+
+---
 
 ## Current State Analysis
 
