@@ -323,7 +323,9 @@ public final class DBReader {
         adapter.open();
         try (FeedItemCursor cursor = new FeedItemCursor(
                 adapter.getLatestNewEpisodesPerFeedCursor(offset, limit))) {
-            return extractItemlistFromCursor(cursor);
+            List<FeedItem> items = extractItemlistFromCursor(cursor);
+            loadAdditionalFeedItemListData(items);
+            return items;
         } finally {
             adapter.close();
         }
