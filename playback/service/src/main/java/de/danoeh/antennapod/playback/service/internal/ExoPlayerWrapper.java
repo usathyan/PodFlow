@@ -516,7 +516,7 @@ public class ExoPlayerWrapper {
             limiter.setReleaseTime(100.0f);   // Medium release (100ms)
             limiter.setRatio(10.0f);          // High ratio for limiting
             limiter.setThreshold(-1.0f);      // Threshold at -1dB to prevent clipping
-            limiter.setPostGain(0.0f);        // No additional gain
+            limiter.setPostGain(3.0f);        // Makeup gain to restore perceived loudness
             dynamicsProcessing.setLimiterByChannelIndex(0, limiter);
 
             // Configure multi-band compressor for dynamic range compression
