@@ -319,6 +319,7 @@ public final class DBReader {
      * @return List of new episodes (latest date per podcast)
      */
     public static List<FeedItem> getLatestNewEpisodesWithSameDay(int offset, int limit, SortOrder sortOrder) {
+        Log.d(TAG, "getLatestNewEpisodesWithSameDay() called with: offset=" + offset + ", limit=" + limit);
         PodDBAdapter adapter = PodDBAdapter.getInstance();
         adapter.open();
         try (FeedItemCursor cursor = new FeedItemCursor(
@@ -529,7 +530,11 @@ public final class DBReader {
     @Nullable
     private static FeedItem getNextSameDayEpisode(long feedId, long currentItemId, java.util.Date pubDate) {
         // Get all downloaded, unplayed episodes from this feed
-        List<FeedItem> episodes = getFeedItemList(getFeed(feedId, false, 0, Integer.MAX_VALUE),
+        Feed feed = getFeed(feedId, false, 0, Integer.MAX_VALUE);
+        if (feed == null) {
+            return null;
+        }
+        List<FeedItem> episodes = getFeedItemList(feed,
                 new FeedItemFilter(FeedItemFilter.DOWNLOADED, FeedItemFilter.UNPLAYED),
                 SortOrder.DATE_NEW_OLD, 0, Integer.MAX_VALUE);
 
